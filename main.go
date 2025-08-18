@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"video-stream/log"
-	"os"
 	"video-stream/schedule"
 )
 
