@@ -21,6 +21,7 @@ var (
 
 // TODO:
 // - Refactor sections of main as independent functions/routines
+// - Use ffprobe to find the english audio track or otherwise default to the first track
 // - Define channel object
 // - Add cancellation to ffmpeg goroutine
 // - Create advance schedule on boot
@@ -99,6 +100,7 @@ func main() {
 				"-b:a", "128k",
 				"-map", "0:v",
 				"-map", "0:a:m:language:eng",
+				"-c", "copy",
 
 				// "-c:v", "copy",
 				// "-c:a", "aac",
