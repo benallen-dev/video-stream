@@ -20,6 +20,7 @@ var (
 )
 
 // TODO:
+// - Graceful shutdown on quit
 // - Refactor sections of main as independent functions/routines
 // - Use ffprobe to find the english audio track or otherwise default to the first track
 // - Define channel object
