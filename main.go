@@ -19,6 +19,18 @@ var (
 	clientsMu sync.Mutex
 )
 
+// TODO:
+// - Refactor sections of main as independent functions/routines
+// - Define channel object
+// - Add cancellation to ffmpeg goroutine
+// - Create advance schedule on boot
+// - Update schedule when media file ends
+// - Add static HTTP routes for channel icons etc
+// - Add EPG support
+// - Add support for multiple channels
+// - Keep in mind potential REST endpoints for manipulating schedule
+// - Dockerise so I can run this on unraid
+
 // getDuration returns the duration of a media file formatted as mm:ss
 func getDuration(file string) (string, error) {
 	cmd := exec.Command(
@@ -57,11 +69,6 @@ func broadcast(data []byte) {
 	}
 }
 
-// TODO:
-// - Figure out how to define channels etc
-// - Maybe vibe code a frontend
-// - Get Jellyfin to properly stream to the Jellyfin TV client (browser works!)
-// - VLC works too, maybe screw it
 func main() {
 	var wg sync.WaitGroup
 
@@ -188,7 +195,7 @@ func main() {
 
 			var m3u = []string{
 				"#EXTM3U",
-				`#EXTINF:-1, tvg-id="chan1" group-title="Cartoons",South Park`,
+				`#EXTINF:-1, tvg-id="chan1" group-title="Cartoons",Cartoons`,
 				"http://192.168.1.35:8080/channel1.ts",
 				// `#EXTINF:-1 tvg-id="chan2" tvg-logo="http://192.168.1.35/logo2.png" group-title="Sports",Channel 2`,
 				// "http://192.168.1.35:8080/channel2.ts",
