@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"path"
 	"net/http"
@@ -32,6 +33,47 @@ var (
 // - Add support for multiple channels
 // - Keep in mind potential REST endpoints for manipulating schedule
 // - Dockerise so I can run this on unraid
+
+// Returns audio langues for a given file
+func getAudioLanguages(input string) (map[int]string, error) {
+	// Run ffprobe to extract audio stream indexes and language tags
+	cmd := exec.Command(
+		"ffprobe",
+		"-v", "error",
+		"-select_streams", "a",
+		"-show_entries", "stream=index:stream_tags=language",
+		"-of", "csv=p=0",
+		input,
+	)
+
+	var out bytes.Buffer
+	cmd.Stdout = &out
+
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	languages := make(map[int]string)
+
+	for _, line := range lines {
+		parts := strings.Split(line, ",")
+		if len(parts) == 2 {
+			// parts[0] = stream index, parts[1] = language
+			// (e.g., "1,eng")
+			idx := strings.TrimSpace(parts[0])
+			lang := strings.TrimSpace(parts[1])
+			if idx != "" && lang != "" {
+				// convert index string to int
+				var streamIdx int
+				fmt.Sscanf(idx, "%d", &streamIdx)
+				languages[streamIdx] = lang
+			}
+		}
+	}
+
+	return languages, nil
+}
 
 // getDuration returns the duration of a media file formatted as mm:ss
 func getDuration(file string) (string, error) {
@@ -87,6 +129,45 @@ func main() {
 				log.Warn("Couldn't get file duration", "error", err.Error())
 			}
 
+			// // Find if english stream exists using ffprobe
+			// langs, err := getAudioLanguages(f)
+			// if err != nil {
+			// 	log.Fatal(err.Error())
+			// }
+
+			// log.Info("Languages:")
+			// hasEng := false
+			// for _, lang := range langs {
+			// 	log.Info(lang)
+			// 	if lang == "eng" {
+			// 		hasEng = true
+			// 	}
+			// }
+
+			// ffmpegArgs := []string{
+			// 	"-re", // Realtime
+			// 	"-i", f, // Input from file
+			// 	"-c:v", "libx264", // h264 video
+			// 	"-preset", "veryfast",
+			// 	// "-c:a","aac",
+			// 	"-ar", "48000",
+			// 	"-b:a", "128k",
+			// 	"-map", "0:v", // Use first video stream
+			// }
+
+			// if hasEng {
+			// 	ffmpegArgs = append(ffmpegArgs, "-map", "0:a:m:language:eng")
+			// } else {
+			// 	ffmpegArgs = append(ffmpegArgs, "-map", "0:a?")
+			// }
+
+			// ffmpegArgs = append(ffmpegArgs,
+			// 	"-f", "mpegts", // format into mpegts so we can just dump it over http
+			// 	"pipe:1", // use stdout so we can pipe it into our go program
+			// 	)
+
+			// cmd := exec.Command("ffmpeg", ffmpegArgs...)
+			// log.Info(cmd.String())
 
 			cmd := exec.Command(
 				"ffmpeg",
@@ -100,8 +181,9 @@ func main() {
 				"-ar", "48000",
 				"-b:a", "128k",
 				"-map", "0:v",
+				"-map", "0:a?",
 				"-map", "0:a:m:language:eng",
-				"-c", "copy",
+				// "-c", "copy",
 
 				// "-c:v", "copy",
 				// "-c:a", "aac",
@@ -110,6 +192,11 @@ func main() {
 			)
 
 			stdout, err := cmd.StdoutPipe()
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+
+			stderr, err := cmd.StderrPipe()
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -134,6 +221,17 @@ func main() {
 					}
 					if err != nil {
 						log.Info("ffmpeg ended:", err)
+						log.Info(cmd.String())
+
+						for {
+							_, err := stderr.Read(buf)
+							log.Info(string(buf))
+							if err != nil {
+								log.Info(err.Error())
+								break
+							}
+						}
+
 						break
 					}
 				}
