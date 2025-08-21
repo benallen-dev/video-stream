@@ -2,10 +2,12 @@ package schedule
 
 import (
 	"bytes"
-	"os/exec"
-	"strings"
-
+	"maps"
 	"math/rand"
+	"os/exec"
+	"path"
+	"slices"
+	"strings"
 
 	"video-stream/log"
 )
@@ -37,11 +39,9 @@ func findShowFiles(root string) ([]string, error) {
 	return files, nil
 }
 
-func findMedia() (*[]string, error) {
+func findMedia() (map[string][]string, error) {
 
-	// We don't know how long this list will be, so let's just use a slice and accept some reallocation
-	// The average show runs for about 200 episodes so we'll initialise it with 200*len(shows)
-	out := make([]string, 0, 200*len(shows))
+	out := make(map[string][]string, 0)
 
 	for _, show := range shows {
 		files, err := findShowFiles(show)
@@ -49,35 +49,31 @@ func findMedia() (*[]string, error) {
 			return nil, err
 		}
 
-		out = append(out, files...)
+		showName := path.Base(show)
+
+		out[showName] = files
 	}
 
-	return &out, nil
-}
-
-
-func Example() error {
-	res, err := findMedia()
-	if err != nil {
-		return err
-	}
-
-	for _, file := range *res {
-		log.Info(file)
-	}
-
-	return nil
+	return out, nil
 }
 
 // Returns the absolute path to the next video file
 // We're assuming there's only one channel for now
 func RandomFile() (string, error) {
-	files, err := findMedia()
+	media, err := findMedia()
 	if err != nil {
 		return "", err
 	}
 
+	// Pick a random show
+	randomIdx := rand.Intn(len(media))
+	keys := slices.Collect(maps.Keys(media))
+	key := keys[randomIdx]
+	files := media[key]
+
+	log.Info("Playing "+key)
+
 	// Pick a random file
-	randomIdx := rand.Intn(len(*files))
-	return (*files)[randomIdx], nil
+	randomIdx = rand.Intn(len(files))
+	return files[randomIdx], nil
 }
