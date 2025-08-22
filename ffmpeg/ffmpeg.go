@@ -92,6 +92,7 @@ func StreamFile(f string, broadcast func([]byte)) {
 	}
 
 	var innerWg sync.WaitGroup
+
 	// Pump ffmpeg → broadcast
 	innerWg.Add(1)
 	go func() {
@@ -99,25 +100,28 @@ func StreamFile(f string, broadcast func([]byte)) {
 
 		for {
 			n, err := stdout.Read(buf)
-			if n > 0 {
-				data := make([]byte, n)
-				copy(data, buf[:n])
-				broadcast(data)
-			}
 			if err != nil {
 				log.Info("ffmpeg ended:", err)
-				log.Info(cmd.String())
+				log.Debug(cmd.String())
 
 				for {
 					_, err := stderr.Read(buf)
-					log.Info(string(buf))
+					log.Warn(string(buf))
 					if err != nil {
-						log.Info(err.Error())
+						log.Debug("Error reading stderr:", "error", err.Error())
 						break
 					}
 				}
 
 				break
+			}
+			if n > 0 {
+				data := make([]byte, n)
+				copy(data, buf[:n])
+				broadcast(data)
+			}
+			if n == 0 {
+				log.Warn("Read zero bytes")
 			}
 		}
 		innerWg.Done()
