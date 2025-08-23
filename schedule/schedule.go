@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"maps"
 	"math/rand"
+	"os"
 	"os/exec"
 	"path"
 	"slices"
@@ -12,7 +13,17 @@ import (
 	"video-stream/log"
 )
 
-var shows = []string{
+var shows []string
+
+func init() {
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Error(err.Error())
+	}
+
+	shows = []string{
+		cwd+"/test-data",
+	}
 }
 
 // Returns a list of media files contained in the root path

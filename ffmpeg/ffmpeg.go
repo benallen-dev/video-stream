@@ -8,13 +8,6 @@ import (
 	"video-stream/log"
 )
 
-func StreamFile(f string, broadcast func([]byte)) {
-
-	dur, err := getDuration(f)
-	if err != nil {
-		log.Warn("Couldn't get file duration", "error", err.Error())
-	}
-
 	// // Find if english stream exists using ffprobe
 	// langs, err := getAudioLanguages(f)
 	// if err != nil {
@@ -55,6 +48,14 @@ func StreamFile(f string, broadcast func([]byte)) {
 	// cmd := exec.Command("ffmpeg", ffmpegArgs...)
 	// log.Info(cmd.String())
 
+func StreamFile(f string, broadcast func([]byte)) {
+
+	dur, err := getDuration(f)
+	if err != nil {
+		log.Warn("Couldn't get file duration", "error", err.Error())
+	}
+
+
 	cmd := exec.Command(
 		"ffmpeg",
 		"-re", // throttle to realtime
@@ -67,7 +68,7 @@ func StreamFile(f string, broadcast func([]byte)) {
 		"-b:a", "128k",
 		"-map", "0:v",
 		"-map", "0:a?",
-		"-map", "0:a:m:language:eng",
+		// "-map", "0:a:m:language:eng",
 		// "-c", "copy",
 
 		// "-c:v", "copy",

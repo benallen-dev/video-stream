@@ -55,6 +55,7 @@ func main() {
 			}
 
 			ffmpeg.StreamFile(f, broadcast)
+			log.Info("ffmpeg.StreamFile finished")
 		}
 	}()
 
