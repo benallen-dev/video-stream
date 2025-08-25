@@ -3,33 +3,28 @@ package server
 import (
 	"net/http"
 	"strings"
-	"sync"
 
+	"video-stream/channel"
 	"video-stream/log"
 )
 
-func Start(clientsMu *sync.Mutex, clients map[chan []byte]struct{}) {
+func Start(ch *channel.Channel) {
+	// For each channel, create a handleFunc
+
+	// Hardcoded for 1 channel for now
 	// HTTP handler: subscribe clients
 	http.HandleFunc("/channel1.ts", func(w http.ResponseWriter, r *http.Request) {
 		log.Info("Client connect to channel1.ts", "requester", r.RemoteAddr)
 
 		w.Header().Set("Content-Type", "video/MP2T")
-		ch := make(chan []byte, 4096)
-
-		clientsMu.Lock()
-		clients[ch] = struct{}{}
-		clientsMu.Unlock()
-
+		conn, cleanup := ch.Connections.Add()
 		defer func() {
-			log.Info("Client disconnected from channel.ts", "requester", r.RemoteAddr)
-			clientsMu.Lock()
-			delete(clients, ch)
-			close(ch)
-			clientsMu.Unlock()
+			log.Info("Client disconnect from channel1.ts", "requester", r.RemoteAddr)
+			cleanup()
 		}()
 
 		// stream to this client
-		for data := range ch {
+		for data := range conn {
 			if _, err := w.Write(data); err != nil {
 				return
 			}

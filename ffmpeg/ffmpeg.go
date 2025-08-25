@@ -106,13 +106,12 @@ func StreamFile(f string, broadcast func([]byte)) {
 
 				for {
 					_, err := stderr.Read(buf)
-					log.Warn(string(buf))
+					log.Debug("Stderr:", "contents", string(buf))
 					if err != nil {
 						log.Debug("Error reading stderr:", "error", err.Error())
 						break
 					}
 				}
-
 				break
 			}
 			if n > 0 {

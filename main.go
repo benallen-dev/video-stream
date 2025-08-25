@@ -5,16 +5,17 @@ import (
 	"sync"
 	"time"
 
-	"video-stream/log"
+	"video-stream/channel"
 	"video-stream/ffmpeg"
+	"video-stream/log"
 	"video-stream/schedule"
 	"video-stream/server"
 )
 
-var (
-	clients   = make(map[chan []byte]struct{})
-	clientsMu sync.Mutex
-)
+// var (
+// 	clients   = make(map[chan []byte]struct{})
+// 	clientsMu sync.Mutex
+// )
 
 // TODO:
 // - Graceful shutdown on quit
@@ -30,20 +31,23 @@ var (
 // - Keep in mind potential REST endpoints for manipulating schedule
 // - Dockerise so I can run this on unraid
 
-func broadcast(data []byte) {
-	clientsMu.Lock()
-	defer clientsMu.Unlock()
-	for ch := range clients {
-		select {
-		case ch <- data:
-		default:
-			// drop if client is too slow
-		}
-	}
-}
+// func broadcast(data []byte) {
+// 	clientsMu.Lock()
+// 	defer clientsMu.Unlock()
+// 	for ch := range clients {
+// 		select {
+// 		case ch <- data:
+// 		default:
+// 			// drop if client is too slow
+// 		}
+// 	}
+// }
 
 func main() {
 	var wg sync.WaitGroup
+
+	// build one channel for testing
+	var channel1 = channel.New("Test", []string{"test-data"})
 
 	// Stream files forever
 	wg.Go(func() {
@@ -57,17 +61,12 @@ func main() {
 
 			log.Info("File", "path", f)
 
-			ffmpeg.StreamFile(f, broadcast)
+			// ffmpeg.StreamFile(f, broadcast)
+			ffmpeg.StreamFile(f, channel1.Broadcast)
 
+			// Space out new files a little bit
 			var DELAY = 5
-				// time.Sleep(time.Duration(5) * time.Second) // just a hunch
-
 			for i := range DELAY {
-				// // Go up a line
-				// fmt.Print("\033[F")
-				// // Clear the line
-				// fmt.Print("\033[K")
-
 				log.Info(fmt.Sprintf("Waiting %d", DELAY-i))
 				time.Sleep(time.Second) // just a hunch
 			}
@@ -77,19 +76,18 @@ func main() {
 
 	// Run the webserver
 	wg.Go(func() {
-		server.Start(&clientsMu, clients)
+		// server.Start(&clientsMu, clients)
+		server.Start(channel1)
 		wg.Done()
 	})
-
-	wg.Wait()
 
 	// Periodically print how many clients are connected
 	go func() {
 		for {
-			clientsMu.Lock()
-			log.Debug(fmt.Sprintf("%d client(s)", len(clients)))
-			clientsMu.Unlock()
-			time.Sleep(time.Duration(300 * time.Second))
+			log.Debug(fmt.Sprintf("Channel1: %d client(s)", channel1.Connections.Count()))
+			time.Sleep(time.Duration(60 * time.Second))
 		}
 	}()
+
+	wg.Wait()
 }
