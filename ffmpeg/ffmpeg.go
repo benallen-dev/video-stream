@@ -95,8 +95,7 @@ func StreamFile(f string, broadcast func([]byte)) {
 	var innerWg sync.WaitGroup
 
 	// Pump ffmpeg → broadcast
-	innerWg.Add(1)
-	go func() {
+	innerWg.Go( func() {
 		buf := make([]byte, 4096)
 
 		for {
@@ -125,7 +124,7 @@ func StreamFile(f string, broadcast func([]byte)) {
 				log.Warn("Read zero bytes")
 			}
 		}
-		innerWg.Done()
-	}()
+	})
+
 	innerWg.Wait()
 }

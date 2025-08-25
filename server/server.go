@@ -8,15 +8,13 @@ import (
 	"video-stream/log"
 )
 
-// clients   = make(map[chan []byte]struct{})
-// clientsMu sync.Mutex
 func Start(clientsMu *sync.Mutex, clients map[chan []byte]struct{}) {
 	// HTTP handler: subscribe clients
 	http.HandleFunc("/channel1.ts", func(w http.ResponseWriter, r *http.Request) {
 		log.Info("Client connect to channel1.ts", "requester", r.RemoteAddr)
 
 		w.Header().Set("Content-Type", "video/MP2T")
-		ch := make(chan []byte, 1024)
+		ch := make(chan []byte, 4096)
 
 		clientsMu.Lock()
 		clients[ch] = struct{}{}

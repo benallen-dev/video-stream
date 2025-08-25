@@ -46,28 +46,43 @@ func main() {
 	var wg sync.WaitGroup
 
 	// Stream files forever
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
+
 		for {
+			log.Info("Starting new file")
 			f, err := schedule.RandomFile()
 			if err != nil {
 				log.Fatal(err.Error())
 			}
 
+			log.Info("File", "path", f)
+
 			ffmpeg.StreamFile(f, broadcast)
-			log.Info("ffmpeg.StreamFile finished")
+
+			var DELAY = 5
+				// time.Sleep(time.Duration(5) * time.Second) // just a hunch
+
+			for i := range DELAY {
+				// // Go up a line
+				// fmt.Print("\033[F")
+				// // Clear the line
+				// fmt.Print("\033[K")
+
+				log.Info(fmt.Sprintf("Waiting %d", DELAY-i))
+				time.Sleep(time.Second) // just a hunch
+			}
 		}
-	}()
+
+	})
 
 	// Run the webserver
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		server.Start(&clientsMu, clients)
 		wg.Done()
-	}()
+	})
 
 	wg.Wait()
-	
+
 	// Periodically print how many clients are connected
 	go func() {
 		for {
@@ -78,4 +93,3 @@ func main() {
 		}
 	}()
 }
-
