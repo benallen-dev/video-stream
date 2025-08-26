@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -46,15 +47,19 @@ import (
 func main() {
 	var wg sync.WaitGroup
 
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Error(err.Error())
+	}
 	// build one channel for testing
-	var channel1 = channel.New("Test", []string{"test-data"})
+	var channel1 = channel.New("Test", []string{cwd+"/test-data"})
 
 	// Stream files forever
 	wg.Go(func() {
 
 		for {
 			log.Info("Starting new file")
-			f, err := schedule.RandomFile()
+			f, err := schedule.RandomFile(channel1)
 			if err != nil {
 				log.Fatal(err.Error())
 			}

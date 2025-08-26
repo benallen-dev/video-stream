@@ -4,27 +4,14 @@ import (
 	"bytes"
 	"maps"
 	"math/rand"
-	"os"
 	"os/exec"
 	"path"
 	"slices"
 	"strings"
 
+	"video-stream/channel"
 	"video-stream/log"
 )
-
-var shows []string
-
-func init() {
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Error(err.Error())
-	}
-
-	shows = []string{
-		cwd+"/test-data",
-	}
-}
 
 // Returns a list of media files contained in the root path
 func findShowFiles(root string) ([]string, error) {
@@ -50,11 +37,11 @@ func findShowFiles(root string) ([]string, error) {
 	return files, nil
 }
 
-func findMedia() (map[string][]string, error) {
+func findMedia(chnl *channel.Channel) (map[string][]string, error) {
 
 	out := make(map[string][]string, 0)
 
-	for _, show := range shows {
+	for _, show := range chnl.Shows {
 		files, err := findShowFiles(show)
 		if err != nil {
 			return nil, err
@@ -70,8 +57,8 @@ func findMedia() (map[string][]string, error) {
 
 // Returns the absolute path to the next video file
 // We're assuming there's only one channel for now
-func RandomFile() (string, error) {
-	media, err := findMedia()
+func RandomFile(chnl *channel.Channel) (string, error) {
+	media, err := findMedia(chnl)
 	if err != nil {
 		return "", err
 	}

@@ -2,7 +2,6 @@ package channel
 
 import (
 	"sync"
-
 	"video-stream/log"
 )
 
@@ -43,7 +42,7 @@ func (cl *ConnectionList) Count() int {
 type Channel struct {
 	Connections ConnectionList
 	name        string
-	shows       []string
+	Shows       []string
 }
 
 func New(name string, shows []string) *Channel {
@@ -51,7 +50,7 @@ func New(name string, shows []string) *Channel {
 
 	return &Channel{
 		name:  name,
-		shows: shows,
+		Shows: shows,
 		Connections: ConnectionList{
 			streams: strMap,
 		},
