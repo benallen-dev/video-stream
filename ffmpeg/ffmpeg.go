@@ -39,7 +39,7 @@ func englishAudioFfmpegCommand(f string) *exec.Cmd {
 
 		// Get input
 		// "-sseof", "-10", // start N seconds from the end
-		"-ss", "45", // skip the first 45 seconds
+		// "-ss", "45", // skip the first 45 seconds
 		"-re", // throttle to realtime
 		"-i", f,
 
