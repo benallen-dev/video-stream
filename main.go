@@ -70,11 +70,11 @@ func main() {
 			ffmpeg.StreamFile(f, channel1.Broadcast)
 
 			// Space out new files a little bit
-			var DELAY = 5
-			for i := range DELAY {
-				log.Info(fmt.Sprintf("Waiting %d", DELAY-i))
-				time.Sleep(time.Second) // just a hunch
-			}
+			// var DELAY = 5
+			// for i := range DELAY {
+			// 	log.Info(fmt.Sprintf("Waiting %d", DELAY-i))
+			// 	time.Sleep(time.Second) // just a hunch
+			// }
 		}
 
 	})
