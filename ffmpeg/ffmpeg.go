@@ -10,22 +10,27 @@ import (
 	"video-stream/log"
 )
 
-func englishAudioFfmpegCommand(f string) *exec.Cmd {
-
+func hasEnglishAudio(f string) bool {
 	// Find if english stream exists using ffprobe
 	langs, err := getAudioLanguages(f)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	log.Info("Languages:")
 	hasEng := false
+	l := []string{}
 	for _, lang := range langs {
-		log.Info(lang)
+		l = append(l, lang)
 		if lang == "eng" {
 			hasEng = true
 		}
 	}
+
+	log.Debugf("Languages: %v", l)
+	return hasEng
+}
+
+func englishAudioFfmpegCommand(f string) *exec.Cmd {
 
 	ffmpegArgs := []string{
 		// Avoid timestamp funkiness
@@ -53,7 +58,7 @@ func englishAudioFfmpegCommand(f string) *exec.Cmd {
 		"-b:a", "128k",
 	}
 
-	if hasEng {
+	if hasEnglishAudio(f) {
 		log.Debug("Mapping eng audio stream")
 		ffmpegArgs = append(ffmpegArgs, "-map", "0:a:m:language:eng")
 	} else {
@@ -66,7 +71,6 @@ func englishAudioFfmpegCommand(f string) *exec.Cmd {
 		"pipe:1", // use stdout so we can pipe it into our go program
 		)
 
-	// log.Info(cmd.String())
 	return exec.Command("ffmpeg", ffmpegArgs...)
 }
 

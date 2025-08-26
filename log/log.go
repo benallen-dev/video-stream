@@ -41,6 +41,11 @@ func Debug(msg string, keysAndValues ...any) {
 	logger.Debug(msg, keysAndValues...)
 }
 
+// Keep in mind calling the package-level Debugf logger will show up as if logger.go is the caller, not the location you called log.Debug from.
+func Debugf(msg string, keysAndValues ...any) {
+	logger.Debug(fmt.Sprintf(msg, keysAndValues...))
+}
+
 // Keep in mind calling the package-level Info logger will show up as if logger.go is the caller, not the location you called log.Info from.
 func Info(msg string, keysAndValues ...any) {
 	logger.Info(msg, keysAndValues...)
