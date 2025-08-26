@@ -13,11 +13,6 @@ import (
 	"video-stream/server"
 )
 
-// var (
-// 	clients   = make(map[chan []byte]struct{})
-// 	clientsMu sync.Mutex
-// )
-
 // TODO:
 // - Graceful shutdown on quit
 // - Don't start streaming media to stdout until a client connects
@@ -31,18 +26,6 @@ import (
 // - Add support for multiple channels
 // - Keep in mind potential REST endpoints for manipulating schedule
 // - Dockerise so I can run this on unraid
-
-// func broadcast(data []byte) {
-// 	clientsMu.Lock()
-// 	defer clientsMu.Unlock()
-// 	for ch := range clients {
-// 		select {
-// 		case ch <- data:
-// 		default:
-// 			// drop if client is too slow
-// 		}
-// 	}
-// }
 
 func main() {
 	var wg sync.WaitGroup
@@ -66,7 +49,6 @@ func main() {
 
 			log.Info("File", "path", f)
 
-			// ffmpeg.StreamFile(f, broadcast)
 			ffmpeg.StreamFile(f, channel1.Broadcast)
 
 			// Space out new files a little bit so clients can catch up
@@ -81,7 +63,6 @@ func main() {
 
 	// Run the webserver
 	wg.Go(func() {
-		// server.Start(&clientsMu, clients)
 		server.Start(channel1)
 		wg.Done()
 	})
