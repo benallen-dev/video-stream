@@ -1,6 +1,7 @@
 package log
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/charmbracelet/lipgloss"
@@ -36,27 +37,47 @@ func Custom(options log.Options) *log.Logger {
 }
 
 // Keep in mind calling the package-level Debug logger will show up as if logger.go is the caller, not the location you called log.Debug from.
-func Debug(msg string, keysAndValues ...interface{}) {
+func Debug(msg string, keysAndValues ...any) {
 	logger.Debug(msg, keysAndValues...)
 }
 
 // Keep in mind calling the package-level Info logger will show up as if logger.go is the caller, not the location you called log.Info from.
-func Info(msg string, keysAndValues ...interface{}) {
+func Info(msg string, keysAndValues ...any) {
 	logger.Info(msg, keysAndValues...)
 }
 
+// Keep in mind calling the package-level Infof logger will show up as if logger.go is the caller, not the location you called log.Info from.
+func Infof(msg string, keysAndValues ...any) {
+	logger.Info(fmt.Sprintf(msg, keysAndValues...))
+}
+
 // Keep in mind calling the package-level Warn logger will show up as if logger.go is the caller, not the location you called log.Warn from.
-func Warn(msg string, keysAndValues ...interface{}) {
+func Warn(msg string, keysAndValues ...any) {
 	logger.Warn(msg, keysAndValues...)
 }
 
+// Keep in mind calling the package-level Warnf logger will show up as if logger.go is the caller, not the location you called log.Warn from.
+func Warnf(msg string, keysAndValues ...any) {
+	logger.Warn(fmt.Sprintf(msg, keysAndValues...))
+}
+
 // Keep in mind calling the package-level Error logger will show up as if logger.go is the caller, not the location you called log.Error from.
-func Error(msg string, keysAndValues ...interface{}) {
+func Error(msg string, keysAndValues ...any) {
 	logger.Error(msg, keysAndValues...)
 }
 
+// Keep in mind calling the package-level Errorf logger will show up as if logger.go is the caller, not the location you called log.Error from.
+func Errorf(msg string, keysAndValues ...any) {
+	logger.Error(fmt.Sprintf(msg, keysAndValues...))
+}
+
 // Keep in mind calling the package-level Fatal logger will show up as if logger.go is the caller, not the location you called log.Fatal from.
-func Fatal(msg string, keysAndValues ...interface{}) {
+func Fatal(msg string, keysAndValues ...any) {
 	logger.Fatal(msg, keysAndValues...)
+}
+
+// Keep in mind calling the package-level Fatalf logger will show up as if logger.go is the caller, not the location you called log.Fatal from.
+func Fatalf(msg string, keysAndValues ...any) {
+	logger.Fatal(fmt.Sprintf(msg, keysAndValues...))
 }
 
