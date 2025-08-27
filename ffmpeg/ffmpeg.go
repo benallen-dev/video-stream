@@ -14,7 +14,7 @@ func hasEnglishAudio(f string) bool {
 	// Find if english stream exists using ffprobe
 	langs, err := getAudioLanguages(f)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("could not get audio languages", "msg", err.Error())
 	}
 
 	hasEng := false

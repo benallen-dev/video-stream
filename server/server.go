@@ -59,6 +59,6 @@ func Start(ch *channel.Channel) {
 	log.Info("Serving on :8080")
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("Error in HTTP server", "msg", err.Error())
 	}
 }
