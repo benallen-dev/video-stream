@@ -175,13 +175,13 @@ func StreamFile(f string, broadcast func([]byte)) {
 
 	dur, err := getDuration(f)
 	if err != nil {
-		log.Warn("Couldn't get file duration", "error", err.Error())
+		log.Warn("couldn't get file duration", "error", err.Error())
 	}
 	log.Info("Running ffmpeg", "file", path.Base(f), "duration", dur)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("could not create stdout pipe", "error", err.Error())
 	}
 
 	// TODO: Figure out how to get output from stderr for debugging without blocking
@@ -191,7 +191,7 @@ func StreamFile(f string, broadcast func([]byte)) {
 	// }
 
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("could not run ffmpeg command", "error", err.Error())
 	}
 
 	var innerWg sync.WaitGroup
