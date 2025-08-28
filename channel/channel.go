@@ -5,7 +5,9 @@ import (
 	"maps"
 	"math/rand"
 	"slices"
+	"time"
 
+	"video-stream/ffmpeg"
 	"video-stream/log"
 )
 
@@ -65,6 +67,28 @@ func (c *Channel) Broadcast(data []byte) {
 	}
 }
 
+func (c *Channel) Start() {
+	for {
+		log.Info("Starting new file", "channel", c.name)
+		f, err := c.RandomFile()
+		if err != nil {
+			log.Error("error getting random file", "msg", err.Error(), "channel", c.name)
+			continue
+		}
+
+		ffmpeg.StreamFile(f, c.Broadcast)
+
+		// Space out new files a little bit so clients can catch up
+		var DELAY = 2
+		for i := range DELAY {
+			log.Info(fmt.Sprintf("Waiting %d", DELAY-i))
+			time.Sleep(time.Second) // just a hunch
+		}
+	}
+}
+
+// Useful for debugging but not something I actually want to expose
+
 func (c *Channel) String() string {
 	s := ""
 	if c.connections.Count() != 1 {
@@ -86,7 +110,7 @@ func (c *Channel) RandomFile() (string, error) {
 	key := keys[randomIdx]
 	files := c.schedule.media[key]
 
-	log.Info("Playing "+key, "channel", c.Name)
+	log.Info("Playing "+key, "channel", c.name)
 
 	// Pick a random file
 	randomIdx = rand.Intn(len(files))

@@ -7,7 +7,6 @@ import (
 
 	"video-stream/channel"
 	"video-stream/config"
-	"video-stream/ffmpeg"
 	"video-stream/log"
 	"video-stream/server"
 )
@@ -67,27 +66,13 @@ func main() {
 		channels = append(channels, channel.New(name, dirs))
 	}
 
-	// Stream files into Go channels
+	// Asynchronous stuff starts here
+
+	// Start channels
 	for _, channel := range channels {
 		wg.Go(func() {
-
-			for {
-				log.Info("Starting new file")
-				f, err := channel.RandomFile()
-				if err != nil {
-					log.Error("error getting random file", "msg", err.Error(), "channel", channel.Name())
-					continue
-				}
-
-				ffmpeg.StreamFile(f, channel.Broadcast)
-
-				// Space out new files a little bit so clients can catch up
-				var DELAY = 2
-				for i := range DELAY {
-					log.Info(fmt.Sprintf("Waiting %d", DELAY-i))
-					time.Sleep(time.Second) // just a hunch
-				}
-			}
+			channel.Start()
+			wg.Done()
 		})
 	}
 
@@ -100,8 +85,9 @@ func main() {
 
 	// Periodically print how many clients are connected
 	go func() {
+		// just runs forever right now
+		// TODO: put in wg.Go when building cancellation
 		watchClientCount(channels)
-		wg.Done()
 	}()
 
 	wg.Wait()
@@ -117,13 +103,13 @@ func watchClientCount(chs []*channel.Channel) {
 	w = w + 4
 
 	for {
-		out := "\n"
+		out := ""
 		for _, ch := range chs {
 			s := ""
 			if ch.Count() != 1 {
 				s = "s"
 			}
-			out += fmt.Sprintf("\t"+ch.Name()+": \x1b[%dG%d client%s\n", w+8, ch.Count(), s) // TODO: Maybe we can get rid of count
+			out += fmt.Sprintf("\n\t"+ch.Name()+": \x1b[%dG%d client%s", w+8, ch.Count(), s) // TODO: Maybe we can get rid of count
 		}
 		log.Debug(out)
 
