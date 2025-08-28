@@ -16,7 +16,6 @@ import (
 // TODO:
 // - Graceful shutdown on quit
 // - Don't start streaming media to stdout until a client connects
-// - Use ffprobe to find the english audio track or otherwise default to the first track
 // - Define channel object
 // - Add cancellation to ffmpeg goroutine
 // - Create advance schedule on boot

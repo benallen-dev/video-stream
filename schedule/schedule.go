@@ -28,6 +28,7 @@ func findShowFiles(root string) ([]string, error) {
 
 	err := cmd.Run()
 	if err != nil {
+		log.Error(out.String())
 		return nil, err
 	}
 
