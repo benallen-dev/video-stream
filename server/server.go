@@ -23,8 +23,6 @@ func getLocalIp() string {
 	}
 
 	for _, addr := range addrs {
-		log.Info(addr.String())
-
 		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
 				return ipnet.IP.String()
@@ -32,6 +30,7 @@ func getLocalIp() string {
 		}
     }
 
+	// TODO: Return error properly
 	log.Error("Could not find local IP address")
 	return ""
 

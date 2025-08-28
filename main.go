@@ -78,13 +78,33 @@ func main() {
 
 	// Periodically print how many clients are connected
 	go func() {
-		for {
-			for i, ch := range channels {
-				log.Debug(fmt.Sprintf("Channel%d - %s: %d client(s)", i+1, ch.Name, ch.Connections.Count()))
-			}
-			time.Sleep(time.Duration(60 * time.Second))
-		}
+		watchClientCount(channels)
+		wg.Done()
 	}()
 
 	wg.Wait()
+}
+
+func watchClientCount(chs []*channel.Channel) {
+	w := 0 // Find width of longest channel name
+	for _, ch := range chs {
+		if len(ch.Name) > w {
+			w = len(ch.Name)
+		}
+	}
+	w = w + 4
+
+	for {
+		out := "\n"
+		for _, ch := range chs {
+			s := ""
+			if ch.Connections.Count() != 1 {
+				s = "s"
+			}
+			out += fmt.Sprintf("\t"+ch.Name+": \x1b[%dG%d client%s\n", w+8, ch.Connections.Count(), s)
+		}
+		log.Debug(out)
+
+		time.Sleep(time.Duration(60 * time.Second))
+	}
 }

@@ -1,43 +1,15 @@
 package channel
 
 import (
-	"sync"
-	"video-stream/log"
+	"fmt"
 )
 
 // TODO: Flesh this guy out with things like a name and where to find media, icons, etc
 // Idk maybe context for ffmpeg or whatever idk sky's the limit
 
-type ConnectionList struct {
-	streams map[chan []byte]struct{}
-	mutex   sync.Mutex
-}
-
-func (cl *ConnectionList) Add() (chan []byte, func()) {
-	ch := make(chan []byte, 4096)
-
-	cl.mutex.Lock()
-	cl.streams[ch] = struct{}{}
-	cl.mutex.Unlock()
-
-	cleanupFn := func() {
-		log.Info("removing stream from channel")
-		cl.mutex.Lock()
-		delete(cl.streams, ch)
-		close(ch)
-		cl.mutex.Unlock()
-	}
-
-	return ch, cleanupFn
-}
-
-func (cl *ConnectionList) Count() int {
-	cl.mutex.Lock()
-	count := len(cl.streams)
-	cl.mutex.Unlock()
-
-	return count
-}
+// TODO:
+// - Roll schedule into channel struct
+// - Add some method of extracting metadata
 
 type Channel struct {
 	Connections ConnectionList
@@ -69,3 +41,13 @@ func (c *Channel) Broadcast(data []byte) {
 		}
 	}
 }
+
+func (c *Channel) String() string {
+	s := ""
+	if c.Connections.Count() != 1 {
+		s = "s"
+	}
+	
+	return fmt.Sprintf("Channel: %s - %d client%s", c.Name, c.Connections.Count(), s)
+}
+
