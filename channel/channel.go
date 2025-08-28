@@ -12,8 +12,8 @@ import (
 // - Add some method of extracting metadata
 
 type Channel struct {
-	Connections ConnectionList
-	Name        string
+	connections ConnectionList
+	name        string
 	Shows       []string
 }
 
@@ -21,19 +21,23 @@ func New(name string, shows []string) *Channel {
 	strMap := make(map[chan []byte]struct{})
 
 	return &Channel{
-		Name:  name,
+		name:  name,
 		Shows: shows,
-		Connections: ConnectionList{
+		connections: ConnectionList{
 			streams: strMap,
 		},
 	}
 }
 
+func (c *Channel) Name() string {
+	return c.name
+}
+
 // Why is this on Channel when everything else is on Connections
 func (c *Channel) Broadcast(data []byte) {
-	c.Connections.mutex.Lock()
-	defer c.Connections.mutex.Unlock()
-	for ch := range c.Connections.streams {
+	c.connections.mutex.Lock()
+	defer c.connections.mutex.Unlock()
+	for ch := range c.connections.streams {
 		select {
 		case ch <- data:
 		default:
@@ -44,10 +48,24 @@ func (c *Channel) Broadcast(data []byte) {
 
 func (c *Channel) String() string {
 	s := ""
-	if c.Connections.Count() != 1 {
+	if c.connections.Count() != 1 {
 		s = "s"
 	}
 	
-	return fmt.Sprintf("Channel: %s - %d client%s", c.Name, c.Connections.Count(), s)
+	return fmt.Sprintf("Channel: %s - %d client%s", c.name, c.connections.Count(), s)
 }
 
+func (c *Channel) Add() (chan []byte, func()) {
+	// Are we the first?
+	//   If so, get the schedule
+	//   Figure out the offset
+	//   Start ffmpeg
+	// In all cases
+	//   Register a stream with the connectionlist
+
+	return c.connections.Add()
+}
+
+func (c *Channel) Count() int {
+	return c.connections.Count()
+}

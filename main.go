@@ -53,7 +53,7 @@ func main() {
 				log.Info("Starting new file")
 				f, err := schedule.RandomFile(channel)
 				if err != nil {
-					log.Error("error getting random file", "msg", err.Error(), "channel", channel.Name)
+					log.Error("error getting random file", "msg", err.Error(), "channel", channel.Name())
 					continue
 				}
 
@@ -88,8 +88,8 @@ func main() {
 func watchClientCount(chs []*channel.Channel) {
 	w := 0 // Find width of longest channel name
 	for _, ch := range chs {
-		if len(ch.Name) > w {
-			w = len(ch.Name)
+		if len(ch.Name()) > w {
+			w = len(ch.Name())
 		}
 	}
 	w = w + 4
@@ -98,10 +98,10 @@ func watchClientCount(chs []*channel.Channel) {
 		out := "\n"
 		for _, ch := range chs {
 			s := ""
-			if ch.Connections.Count() != 1 {
+			if ch.Count() != 1 {
 				s = "s"
 			}
-			out += fmt.Sprintf("\t"+ch.Name+": \x1b[%dG%d client%s\n", w+8, ch.Connections.Count(), s)
+			out += fmt.Sprintf("\t"+ch.Name()+": \x1b[%dG%d client%s\n", w+8, ch.Count(), s) // TODO: Maybe we can get rid of count
 		}
 		log.Debug(out)
 

@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"strings"
 
@@ -10,47 +9,37 @@ import (
 	"video-stream/log"
 )
 
-func getLocalIp() string {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		log.Error("Could not get IP", "msg", err.Error())
-		return ""
-	}
-
-	if len(addrs) == 0 {
-		log.Error("No network interfaces found")
-		return ""
-	}
-
-	for _, addr := range addrs {
-		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String()
-			}
-		}
-    }
-
-	// TODO: Return error properly
-	log.Error("Could not find local IP address")
-	return ""
-
-}
-
 func Start(chs []*channel.Channel) {
-	// For each channel, create a handler that subscribes clients
+	// Set up m3u file
+
+	ip := getLocalIp()
+
+	var m3u = []string{
+		"#EXTM3U",
+	}
+
+	// For each channel, add to the m3u and create a handler that subscribes clients
 	for i, ch := range chs {
-		http.HandleFunc(fmt.Sprintf("/channel%d.ts", i+1), func(w http.ResponseWriter, r *http.Request) {
-			log.Info(fmt.Sprintf("Client connect to channel%d.ts", i+1), "requester", r.RemoteAddr)
+		route := fmt.Sprintf("/channel%d.ts", i+1)
+
+		m3u = append(m3u,
+			fmt.Sprintf(`#EXTINF:-1, tvg-logo="" tvg-id="%s" group-title="%s", %s`, route, ch.Name(), ch.Name()),
+			fmt.Sprintf(`http://%s:8080%s`, ip, route),
+		)
+
+		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
+			log.Info("client connected", "route", route, "channelName", ch.Name(), "client", r.RemoteAddr)
 
 			w.Header().Set("Content-Type", "video/MP2T")
-			conn, cleanup := ch.Connections.Add()
+
+			stream, cleanup := ch.Add() // Add Connection, get datastream and cleanup fn
 			defer func() {
-				log.Info(fmt.Sprintf("Client disconnected from channel%d.ts", i+1), "requester", r.RemoteAddr)
+			log.Info("client disconnected", "route", route, "channelName", ch.Name(), "client", r.RemoteAddr)
 				cleanup()
 			}()
 
 			// stream to this client
-			for data := range conn {
+			for data := range stream {
 				if _, err := w.Write(data); err != nil {
 					return
 				}
@@ -61,35 +50,10 @@ func Start(chs []*channel.Channel) {
 		})
 	}
 
-	// http.HandleFunc("/channel2.ts", func(w http.ResponseWriter, r *http.Request) {
-	// 	log.Info("Client connect to channel2.ts", "requester", r.RemoteAddr)
-
-	// 	w.Header().Set("Content-Type", "video/MP2T")
-	// 	w.WriteHeader(http.StatusTeapot)
-	// })
-
 	// Simple playlist
 	http.HandleFunc("/playlist.m3u", func(w http.ResponseWriter, r *http.Request) {
-		log.Info("Client connect to playlist.m3u")
+		log.Info("client requested playlist.m3u", "client", r.RemoteAddr)
 		w.Header().Set("Content-Type", "application/x-mpegURL")
-
-		ip := getLocalIp()
-
-		var m3u = []string{
-			"#EXTM3U",
-			// `#EXTINF:-1, tvg-id="channel1" group-title="Cartoons",Cartoons`,
-			// "http://192.168.1.35:8080/channel1.ts",
-			// `#EXTINF:-1 tvg-id="channel2" tvg-logo="http://192.168.1.35/logo2.png" group-title="Sports",Channel 2`,
-			// "http://192.168.1.35:8080/channel2.ts",
-		}
-
-		for i, ch := range chs {
-			m3u = append(m3u,
-				fmt.Sprintf(`#EXTINF:-1, tvg-logo="" tvg-id="channel%d" group-title="%s", %s`, i+1, ch.Name, ch.Name),
-				fmt.Sprintf(`http://%s:8080/channel%d.ts`, ip, i+1),
-			)
-		}
-
 		w.Write([]byte(strings.Join(m3u, "\n")))
 	})
 
