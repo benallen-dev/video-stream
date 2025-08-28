@@ -32,7 +32,9 @@ func Start(chs []*channel.Channel) {
 
 			w.Header().Set("Content-Type", "video/MP2T")
 
-			stream, cleanup := ch.Add() // Add Connection, get datastream and cleanup fn
+			// Add Connection, get datastream and cleanup fn
+			stream, cleanup := ch.AddClient()
+
 			defer func() {
 			log.Info("client disconnected", "route", route, "channelName", ch.Name(), "client", r.RemoteAddr)
 				cleanup()

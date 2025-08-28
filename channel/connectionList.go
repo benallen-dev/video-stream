@@ -5,12 +5,12 @@ import (
 	"video-stream/log"
 )
 
-type ConnectionList struct {
+type connectionList struct {
 	streams map[chan []byte]struct{}
 	mutex   sync.Mutex
 }
 
-func (cl *ConnectionList) Add() (chan []byte, func()) {
+func (cl *connectionList) Add() (chan []byte, func()) {
 	ch := make(chan []byte, 4096)
 
 	cl.mutex.Lock()
@@ -28,7 +28,7 @@ func (cl *ConnectionList) Add() (chan []byte, func()) {
 	return ch, cleanupFn
 }
 
-func (cl *ConnectionList) Count() int {
+func (cl *connectionList) Count() int {
 	cl.mutex.Lock()
 	count := len(cl.streams)
 	cl.mutex.Unlock()
