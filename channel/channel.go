@@ -41,7 +41,7 @@ func (cl *ConnectionList) Count() int {
 
 type Channel struct {
 	Connections ConnectionList
-	name        string
+	Name        string
 	Shows       []string
 }
 
@@ -49,7 +49,7 @@ func New(name string, shows []string) *Channel {
 	strMap := make(map[chan []byte]struct{})
 
 	return &Channel{
-		name:  name,
+		Name:  name,
 		Shows: shows,
 		Connections: ConnectionList{
 			streams: strMap,
