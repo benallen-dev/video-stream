@@ -5,6 +5,7 @@ import (
 	"maps"
 	"math/rand"
 	"slices"
+	"strings"
 	"time"
 
 	"video-stream/ffmpeg"
@@ -44,6 +45,10 @@ func (c *Channel) Name() string {
 	return c.name
 }
 
+func (c *Channel) Route() string {
+	return fmt.Sprintf("/%s.ts", strings.ToLower( strings.ReplaceAll(c.name, " ", "-")))
+}
+
 func (c *Channel) AddClient() (chan []byte, func()) {
 	// Are we the first?
 	//   If so, get the schedule
@@ -69,7 +74,7 @@ func (c *Channel) Broadcast(data []byte) {
 
 func (c *Channel) Start() {
 	for {
-		log.Info("Starting new file", "channel", c.name)
+		// log.Info("Starting new file", "channel", c.name)
 		f, err := c.RandomFile()
 		if err != nil {
 			log.Error("error getting random file", "msg", err.Error(), "channel", c.name)
@@ -110,7 +115,7 @@ func (c *Channel) RandomFile() (string, error) {
 	key := keys[randomIdx]
 	files := c.schedule.media[key]
 
-	log.Info("Playing "+key, "channel", c.name)
+	log.Info("Picked new file", "show", key, "channel", c.name)
 
 	// Pick a random file
 	randomIdx = rand.Intn(len(files))

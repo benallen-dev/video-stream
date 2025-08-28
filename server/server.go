@@ -10,20 +10,24 @@ import (
 )
 
 func Start(chs []*channel.Channel) {
-	// Set up m3u file
+	// Static file hosting from ./public
+	fs := http.FileServer(http.Dir("public"))
+	http.Handle("/", fs)
 
 	ip := getLocalIp()
 
-	var m3u = []string{
+	// Set up m3u file
+	var playlist = []string{
 		"#EXTM3U",
+		"#PLAYLIST Channels",
 	}
 
 	// For each channel, add to the m3u and create a handler that subscribes clients
-	for i, ch := range chs {
-		route := fmt.Sprintf("/channel%d.ts", i+1)
+	for _, ch := range chs {
+		route := ch.Route()
 
-		m3u = append(m3u,
-			fmt.Sprintf(`#EXTINF:-1, tvg-logo="" tvg-id="%s" group-title="%s", %s`, route, ch.Name(), ch.Name()),
+		playlist = append(playlist,
+			fmt.Sprintf(`#EXTINF:-1, %s`, ch.Name()),
 			fmt.Sprintf(`http://%s:8080%s`, ip, route),
 		)
 
@@ -56,7 +60,7 @@ func Start(chs []*channel.Channel) {
 	http.HandleFunc("/playlist.m3u", func(w http.ResponseWriter, r *http.Request) {
 		log.Info("client requested playlist.m3u", "client", r.RemoteAddr)
 		w.Header().Set("Content-Type", "application/x-mpegURL")
-		w.Write([]byte(strings.Join(m3u, "\n")))
+		w.Write([]byte(strings.Join(playlist, "\n")))
 	})
 
 	log.Info("Serving on :8080")
