@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
 	"video-stream/channel"
+	"video-stream/config"
 	"video-stream/ffmpeg"
 	"video-stream/log"
 	"video-stream/schedule"
@@ -14,33 +14,38 @@ import (
 )
 
 // TODO:
-// - Don't start streaming media to stdout until a client connects
-// - Graceful shutdown on quit
-// - Add cancellation to ffmpeg goroutine
-// - Create advance schedule on boot?
-// - Update schedule when media file ends?
-// - Add static HTTP routes for channel icons etc
-// - Add EPG support
-// - Frontend
-// - Keep in mind potential REST endpoints for manipulating schedule
-// - Support skipping episodes via web UI
-// - Dockerise so I can run this on unraid
+// - Logging:
+//  - Add context for which channel the log originates from
+// - Scheduling
+//   - Generate schedule when starting
+//   - Periodically extend schedule
+//   - Use schedule when deciding what to play
+// - Optimisation
+//   - Don't start ffmpeg streaming media to stdout until a client connects
+//   - Add cancellation to ffmpeg goroutine
+//   - Graceful shutdown on quit
+//   - Dockerise so I can run this on unraid
+// - User Interface
+//   - Add static HTTP routes for channel icons etc
+//   - Add EPG support
+//   - Frontend for monitoring/configuration
+//   - Support skipping episodes via web UI
 
 func main() {
 	var wg sync.WaitGroup
 
-	cwd, err := os.Getwd()
+	// Read config and build "channels"
+	cfg, err := config.Read()
 	if err != nil {
-		log.Error(err.Error())
+		log.Fatal("Could not read config", "msg", err.Error())
 	}
 
-	channels := []*channel.Channel{
-		channel.New("Testing", []string{
-			cwd+"/test-data",
-		}),
+	channels := make([]*channel.Channel, 0, len(cfg.Channels))
+	for name, dirs := range cfg.Channels {
+		channels = append(channels, channel.New(name, dirs))
 	}
 
-	// Stream files forever
+	// Stream files into Go channels
 	for _, channel := range channels {
 		wg.Go(func() {
 
@@ -51,8 +56,6 @@ func main() {
 					log.Error("error getting random file", "msg", err.Error(), "channel", channel.Name)
 					continue
 				}
-
-				log.Info("File", "path", f)
 
 				ffmpeg.StreamFile(f, channel.Broadcast)
 
