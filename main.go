@@ -48,7 +48,8 @@ func main() {
 				log.Info("Starting new file")
 				f, err := schedule.RandomFile(channel)
 				if err != nil {
-					log.Fatal("error getting random file", "msg", err.Error())
+					log.Error("error getting random file", "msg", err.Error(), "channel", channel.Name)
+					continue
 				}
 
 				log.Info("File", "path", f)

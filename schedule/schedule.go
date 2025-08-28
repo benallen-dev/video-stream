@@ -28,6 +28,7 @@ func findShowFiles(root string) ([]string, error) {
 
 	err := cmd.Run()
 	if err != nil {
+		log.Debug(cmd.String())
 		log.Error(out.String())
 		return nil, err
 	}
@@ -58,9 +59,10 @@ func findMedia(chnl *channel.Channel) (map[string][]string, error) {
 
 // Returns the absolute path to the next video file
 // We're assuming there's only one channel for now
-func RandomFile(chnl *channel.Channel) (string, error) {
-	media, err := findMedia(chnl)
+func RandomFile(ch *channel.Channel) (string, error) {
+	media, err := findMedia(ch)
 	if err != nil {
+		log.Warn("Could not find media", "channel", ch.Name)
 		return "", err
 	}
 
@@ -70,7 +72,7 @@ func RandomFile(chnl *channel.Channel) (string, error) {
 	key := keys[randomIdx]
 	files := media[key]
 
-	log.Info("Playing "+key)
+	log.Info("Playing "+key, "channel", ch.Name)
 
 	// Pick a random file
 	randomIdx = rand.Intn(len(files))
