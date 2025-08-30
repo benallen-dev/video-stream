@@ -2,9 +2,6 @@ package channel
 
 import (
 	"fmt"
-	"maps"
-	"math/rand"
-	"slices"
 	"strings"
 	"time"
 
@@ -46,7 +43,7 @@ func (c *Channel) Name() string {
 }
 
 func (c *Channel) Route() string {
-	return fmt.Sprintf("/%s.ts", strings.ToLower( strings.ReplaceAll(c.name, " ", "-")))
+	return fmt.Sprintf("/%s.ts", strings.ToLower(strings.ReplaceAll(c.name, " ", "-")))
 }
 
 func (c *Channel) AddClient() (chan []byte, func()) {
@@ -75,11 +72,7 @@ func (c *Channel) Broadcast(data []byte) {
 func (c *Channel) Start() {
 	for {
 		// log.Info("Starting new file", "channel", c.name)
-		f, err := c.RandomFile()
-		if err != nil {
-			log.Error("error getting random file", "msg", err.Error(), "channel", c.name)
-			continue
-		}
+		f := c.schedule.randomFile().path
 
 		ffmpeg.StreamFile(f, c.Broadcast)
 
@@ -105,19 +98,4 @@ func (c *Channel) String() string {
 
 func (c *Channel) Count() int {
 	return c.connections.Count()
-}
-
-func (c *Channel) RandomFile() (string, error) {
-
-	// Pick a random show
-	randomIdx := rand.Intn(len(c.schedule.media))
-	keys := slices.Collect(maps.Keys(c.schedule.media))
-	key := keys[randomIdx]
-	files := c.schedule.media[key]
-
-	log.Info("Picked new file", "show", key, "channel", c.name)
-
-	// Pick a random file
-	randomIdx = rand.Intn(len(files))
-	return files[randomIdx], nil
 }

@@ -68,4 +68,6 @@ func Start(chs []*channel.Channel) {
 	if err != nil {
 		log.Fatal("Error in HTTP server", "msg", err.Error())
 	}
+
+	// TODO: Add graceful shutdown
 }

@@ -2,15 +2,18 @@ package channel
 
 import (
 	"bytes"
+	"math/rand"
 	"os/exec"
 	"path"
+	"maps"
 	"strings"
+	"slices"
 
 	"video-stream/log"
 )
 
 type schedule struct{
-	media map[string][]string
+	media map[string][]mediafile
 }
 
 func newSchedule(shows []string) *schedule {
@@ -24,21 +27,13 @@ func newSchedule(shows []string) *schedule {
 	return &schedule{
 		media: media,
 	}
-
 }
 
-func findMedia(dirs []string) (map[string][]string, error) {
+func findMedia(dirs []string) (map[string][]mediafile, error) {
 
-	out := make(map[string][]string, 0)
+	out := make(map[string][]mediafile, 0)
 
-	// For each show
 	for _, dir := range dirs {
-		// Find files in this directory
-		// files, err := findShowFiles(show)
-		// if err != nil {
-		// 	return nil, err
-		// }
-
 		cmd := exec.Command(
 			"find",
 			dir,
@@ -58,12 +53,25 @@ func findMedia(dirs []string) (map[string][]string, error) {
 
 		// Split output by newlines to get individual file paths
 		files := strings.Split(strings.TrimSpace(buf.String()), "\n")
-
+		
 		showName := path.Base(dir)
-
-		out[showName] = files
+		out[showName] = make([]mediafile, len(files))
+		for i, f := range files {
+			out[showName][i] = mediafile{ path: f }
+		}
 	}
 
 	return out, nil
 }
 
+func (s schedule) randomFile() mediafile {
+	// Pick a random show
+	randomIdx := rand.Intn(len(s.media))
+	keys := slices.Collect(maps.Keys(s.media))
+	key := keys[randomIdx]
+	files := s.media[key]
+
+	// Pick a random file
+	randomIdx = rand.Intn(len(files))
+	return files[randomIdx]
+}
