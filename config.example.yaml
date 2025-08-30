@@ -1,3 +1,4 @@
+logLevel: info
 channels:
   Name of Channel:
   - /path/to/directory/containing/media/files

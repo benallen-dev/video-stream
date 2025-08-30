@@ -27,6 +27,26 @@ func init() {
 	logger.SetStyles(styles)
 }
 
+// SetLevel sets the level for the default logger
+func SetLevel(in string) {
+	// TODO: Does charm log have a string -> Level function?
+	switch in {
+	case "debug":
+		logger.SetLevel(log.DebugLevel)
+	case "info":
+		logger.SetLevel(log.InfoLevel)
+	case "warn":
+		logger.SetLevel(log.WarnLevel)
+	case "error":
+		logger.SetLevel(log.ErrorLevel)
+	case "fatal":
+		logger.SetLevel(log.FatalLevel)
+	default:
+		log.Info("Falling back to default loglevel")
+		logger.SetLevel(log.InfoLevel)
+	}
+}
+
 // Global returns the global logger, configured with sensible defaults.
 func Default() log.Logger {
 	return *logger

@@ -61,6 +61,8 @@ func main() {
 		log.Fatal("Could not read config", "msg", err.Error())
 	}
 
+	log.SetLevel(cfg.LogLevel)
+
 	channels := make([]*channel.Channel, 0, len(cfg.Channels))
 	for name, dirs := range cfg.Channels {
 		channels = append(channels, channel.New(name, dirs))
