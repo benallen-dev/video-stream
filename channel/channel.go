@@ -10,9 +10,6 @@ import (
 	"video-stream/log"
 )
 
-// TODO:
-// - Add some method of extracting metadata
-
 // Channel behaves like an old school TV channel, except it's streaming MPEG-TS
 // instead of analogue TV signals.
 //

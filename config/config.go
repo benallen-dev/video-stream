@@ -9,7 +9,6 @@ import (
 	"video-stream/log"
 )
 
-// TODO: Define Read/Write as methods?
 type Config struct {
 	LogLevel string
 	Channels map[string][]string
