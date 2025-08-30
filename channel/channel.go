@@ -5,12 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"video-stream/ffmpeg"
 	"video-stream/log"
 )
-
-// TODO: Flesh this guy out with things like a name and where to find media, icons, etc
-// Idk maybe context for ffmpeg or whatever idk sky's the limit
 
 // TODO:
 // - Add some method of extracting metadata
@@ -72,9 +68,9 @@ func (c *Channel) Broadcast(data []byte) {
 func (c *Channel) Start() {
 	for {
 		// log.Info("Starting new file", "channel", c.name)
-		f := c.schedule.randomFile().path
+		f := c.schedule.randomFile()
 
-		ffmpeg.StreamFile(f, c.Broadcast)
+		streamFile(f, c.Broadcast)
 
 		// Space out new files a little bit so clients can catch up
 		var DELAY = 2
