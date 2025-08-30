@@ -6,32 +6,43 @@ import (
 )
 
 type connectionList struct {
+	mu      sync.Mutex
 	streams map[chan []byte]struct{}
-	mutex   sync.Mutex
 }
 
-func (cl *connectionList) Add() (chan []byte, func()) {
+func (cl *connectionList) add() (chan []byte, func()) {
 	ch := make(chan []byte, 4096)
 
-	cl.mutex.Lock()
+	cl.mu.Lock()
 	cl.streams[ch] = struct{}{}
-	cl.mutex.Unlock()
+	cl.mu.Unlock()
 
 	cleanupFn := func() {
 		log.Info("removing stream from channel")
-		cl.mutex.Lock()
+		cl.mu.Lock()
 		delete(cl.streams, ch)
 		close(ch)
-		cl.mutex.Unlock()
+		cl.mu.Unlock()
 	}
 
 	return ch, cleanupFn
 }
 
+func (cl *connectionList) broadcast(data []byte) {
+	cl.mu.Lock()
+	defer cl.mu.Unlock()
+	for ch := range cl.streams {
+		select {
+		case ch <- data:
+		default:
+			// drop if client is too slow
+		}
+	}
+}
 func (cl *connectionList) Count() int {
-	cl.mutex.Lock()
+	cl.mu.Lock()
 	count := len(cl.streams)
-	cl.mutex.Unlock()
+	cl.mu.Unlock()
 
 	return count
 }

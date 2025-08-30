@@ -45,27 +45,13 @@ func (c *Channel) AddClient() (chan []byte, func()) {
 	// In all cases
 	//   Register a stream with the connectionlist
 
-	return c.connections.Add()
+	return c.connections.add()
 }
 
-func (c *Channel) Broadcast(data []byte) {
-	c.connections.mutex.Lock()
-	defer c.connections.mutex.Unlock()
-	for ch := range c.connections.streams {
-		select {
-		case ch <- data:
-		default:
-			// drop if client is too slow
-		}
-	}
-}
 
 func (c *Channel) Start() {
 	for {
-		// log.Info("Starting new file", "channel", c.name)
-		f := c.schedule.randomFile()
-
-		streamFile(f, c.Broadcast)
+		streamFile(c.schedule.randomFile(), c.connections.broadcast)
 
 		// Space out new files a little bit so clients can catch up
 		var DELAY = 2
