@@ -2,7 +2,6 @@ package channel
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"video-stream/log"
@@ -36,10 +35,6 @@ func New(name string, shows []string) *Channel {
 
 func (c *Channel) Name() string {
 	return c.name
-}
-
-func (c *Channel) Route() string {
-	return fmt.Sprintf("/%s.ts", strings.ToLower(strings.ReplaceAll(c.name, " ", "-")))
 }
 
 func (c *Channel) AddClient() (chan []byte, func()) {

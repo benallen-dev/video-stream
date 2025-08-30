@@ -24,7 +24,7 @@ func Start(chs []*channel.Channel) {
 
 	// For each channel, add to the m3u and create a handler that subscribes clients
 	for _, ch := range chs {
-		route := ch.Route()
+		route := fmt.Sprintf("/%s.ts", strings.ToLower(strings.ReplaceAll(ch.Name(), " ", "-")))
 
 		playlist = append(playlist,
 			fmt.Sprintf(`#EXTINF:-1, %s`, ch.Name()),
