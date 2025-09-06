@@ -3,6 +3,7 @@ package channel
 import (
 	"bytes"
 	"math/rand"
+	"os"
 	"os/exec"
 	"path"
 	"maps"
@@ -36,7 +37,7 @@ func findMedia(dirs []string) (map[string][]mediafile, error) {
 	for _, dir := range dirs {
 		cmd := exec.Command(
 			"find",
-			dir,
+			os.ExpandEnv(dir),
 			"-type", "f",
 			"-iregex", ".*\\.\\(mp4\\|mkv\\|mov\\|avi\\|flv\\|wmv\\|webm\\)$",
 		)
