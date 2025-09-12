@@ -57,7 +57,6 @@ func main() {
 	for _, channel := range channels {
 		wg.Go(func() {
 			channel.Start(ctx)
-			wg.Done()
 		})
 	}
 
@@ -65,7 +64,6 @@ func main() {
 	wg.Go(func() {
 		log.Debug("Starting http server")
 		server.Start(ctx, channels)
-		wg.Done()
 	})
 
 	// Periodically print how many clients are connected

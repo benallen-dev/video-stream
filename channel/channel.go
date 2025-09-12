@@ -141,24 +141,27 @@ func (c *Channel) Start(ctx context.Context) error {
 // terminate playback, otherwise the goroutine will continue running until the
 // parent context expires.
 func (c *Channel) StartPlayer(ctx context.Context) func() {
+	var DELAY = 2
 	childCtx, cancelCtx := context.WithCancel(ctx)
 
 	go func() {
 		for {
 			log.Debug("[StartPlayer] Starting stream", "channel", c.Name())
 			c.streamFile(c.schedule.randomFile(), childCtx)
+			log.Debug("[StartPlayer] Stream finished", "channel", c.Name())
 
 			select {
 			case <-childCtx.Done():
 				log.Debug("[StartPlayer] context is canceled, exiting")
 				return
 			default:
-				// Space out new files a little bit so clients can catch up
-				var DELAY = 2
-				for i := range DELAY {
-					log.Info(fmt.Sprintf("Waiting %d", DELAY-i))
-					time.Sleep(time.Second) // just a hunch
-				}
+				log.Debug("[StartPlayer] waiting %d seconds before starting next file", DELAY)
+				time.Sleep(time.Duration(2*time.Second))
+				// // Space out new files a little bit so clients can catch up
+				// for i := range DELAY {
+				// 	log.Info(fmt.Sprintf("Waiting %d", DELAY-i))
+				// 	time.Sleep(time.Second) // just a hunch
+				// }
 			}
 		}
 	}()
