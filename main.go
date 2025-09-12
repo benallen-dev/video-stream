@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"video-stream/channel"
 	"video-stream/config"
@@ -31,6 +35,8 @@ import (
 
 func main() {
 	var wg sync.WaitGroup
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	defer ctxCancel()
 
 	// Read config and build "channels"
 	cfg, err := config.Read()
@@ -50,7 +56,7 @@ func main() {
 	// Start channels
 	for _, channel := range channels {
 		wg.Go(func() {
-			channel.Start()
+			channel.Start(ctx)
 			wg.Done()
 		})
 	}
@@ -67,6 +73,16 @@ func main() {
 		// just runs forever right now
 		// TODO: put in wg.Go when building cancellation
 		watchClientCount(channels)
+	}()
+
+	// Wait for interrupt
+	go func() {
+		done := make(chan os.Signal, 1)
+  		signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
+  		fmt.Println("Blocking, press ctrl+c to continue...")
+  		<-done  // Will block here until user hits ctrl+c
+		log.Info("Received interrupt")
+  		ctxCancel()
 	}()
 
 	wg.Wait()

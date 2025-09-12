@@ -1,14 +1,46 @@
 package channel
 
 import (
-	"path"
-	"sync"
+	"context"
 	"fmt"
 	"os/exec"
+	"path"
+	"sync"
 	"time"
 
 	"video-stream/log"
 )
+
+type PlayRequest interface {
+	isPlayRequest()
+	Time() time.Time
+}
+
+type playRequest struct {
+	reqTime time.Time
+}
+
+func (p playRequest) isPlayRequest()  {}
+func (p playRequest) Time() time.Time { return p.reqTime }
+
+type StopRequest interface {
+	isStopRequest()
+	Time() time.Time
+}
+type stopRequest struct {
+	reqTime time.Time
+}
+
+func (s stopRequest) isStopRequest()  {}
+func (s stopRequest) Time() time.Time { return s.reqTime }
+
+func playNow() *playRequest {
+	return &playRequest{reqTime: time.Now()}
+}
+
+func stopNow() *stopRequest {
+	return &stopRequest{reqTime: time.Now()}
+}
 
 // Channel behaves like an old school TV channel, except it's streaming MPEG-TS
 // instead of analogue TV signals.
@@ -19,10 +51,15 @@ type Channel struct {
 	name        string
 	schedule    *schedule
 	connections *connectionList
+	ffmpegCmd   *exec.Cmd
+	playChan    chan PlayRequest
+	stopChan    chan StopRequest
 }
 
 func New(name string, shows []string) *Channel {
 	strMap := make(map[chan []byte]struct{})
+	playChan := make(chan PlayRequest)
+	stopChan := make(chan StopRequest)
 
 	return &Channel{
 		name:     name,
@@ -30,6 +67,8 @@ func New(name string, shows []string) *Channel {
 		connections: &connectionList{
 			streams: strMap,
 		},
+		playChan: playChan,
+		stopChan: stopChan,
 	}
 }
 
@@ -44,26 +83,48 @@ func (c *Channel) AddClient() (chan []byte, func()) {
 	//   Start ffmpeg
 	// In all cases
 	//   Register a stream with the connectionlist
+	if c.connections.Count() == 0 {
+		c.playChan <- playNow()
+	}
 
-	return c.connections.add()
+	conn, cleanup := c.connections.add()
+	return conn, func() {
+		cleanup()
+		c.stopChan <- stopNow()
+	}
 }
 
-func (c *Channel) Start() {
+func (c *Channel) Start(ctx context.Context) {
+	// TODO: Make work properly
+
 	// Hang out until AddClient is called or parent context is canceled
 	// Start streaming media until media context or parent context is canceled
 	// GOTO 10
+outer:
 	for {
-		c.streamFile(c.schedule.randomFile())
+		select { // block until recieving a signal
+		case <-ctx.Done():
 
-		// Space out new files a little bit so clients can catch up
-		var DELAY = 2
-		for i := range DELAY {
-			log.Info(fmt.Sprintf("Waiting %d", DELAY-i))
-			time.Sleep(time.Second) // just a hunch
+			break outer
+
+		case playReq := <-c.foo:
+			log.Info("Play requested", "request time", playReq.reqTime.Format(time.DateTime))
+			c.streamFile(c.schedule.randomFile())
+
+			// Space out new files a little bit so clients can catch up
+			var DELAY = 2
+			for i := range DELAY {
+				log.Info(fmt.Sprintf("Waiting %d", DELAY-i))
+				time.Sleep(time.Second) // just a hunch
+			}
 		}
 	}
 }
 
+func (c *Channel) streamLoop() {
+	//
+
+}
 
 // Useful for debugging but not something I actually want to expose
 
@@ -80,15 +141,15 @@ func (c *Channel) Count() int {
 	return c.connections.Count()
 }
 
-func (c *Channel) streamFile(f mediafile) {
+func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 
-	var audioMap string	
+	var audioMap string
 	if f.hasEnglishAudio() {
 		log.Debug("Mapping eng audio stream")
 		audioMap = "0:a:m:language:eng"
 	} else {
 		log.Debug("Mapping all audio streams")
-		audioMap= "0:a"
+		audioMap = "0:a"
 	}
 
 	ffmpegArgs := []string{
@@ -122,6 +183,7 @@ func (c *Channel) streamFile(f mediafile) {
 	}
 
 	cmd := exec.Command("ffmpeg", ffmpegArgs...)
+	c.ffmpegCmd = cmd
 
 	dur, err := f.Duration()
 	if err != nil {
@@ -147,32 +209,40 @@ func (c *Channel) streamFile(f mediafile) {
 	var innerWg sync.WaitGroup
 
 	// Pump ffmpeg → broadcast
-	innerWg.Go( func() {
+	innerWg.Go(func() {
 		buf := make([]byte, 4096)
 
 		for {
-			n, err := stdout.Read(buf)
-			if err != nil {
-				log.Info("ffmpeg ended:", "reason", err)
-				log.Debug(cmd.String())
+			select {
+			case <-ctx.Done():
+				// kill ffmpeg command and return
+				log.Debug("streamFile context canceled, killing ffmpeg and returning", "channel", c.Name())
+				cmd.Process.Kill()
+				return
+			default:
+				n, err := stdout.Read(buf)
+				if err != nil {
+					log.Info("ffmpeg ended:", "reason", err)
+					log.Debug(cmd.String())
 
-				// for {
-				// 	n, err := stderr.Read(buf)
-				// 	log.Debug("Stderr:", "contents", string(buf[:n]))
-				// 	if err != nil {
-				// 		log.Debug("Error reading stderr:", "error", err.Error())
-				// 		break
-				// 	}
-				// }
-				break
-			}
-			if n > 0 {
-				data := make([]byte, n)
-				copy(data, buf[:n])
-				c.connections.broadcast(data)
-			}
-			if n == 0 {
-				log.Warn("Read zero bytes")
+					// for {
+					// 	n, err := stderr.Read(buf)
+					// 	log.Debug("Stderr:", "contents", string(buf[:n]))
+					// 	if err != nil {
+					// 		log.Debug("Error reading stderr:", "error", err.Error())
+					// 		break
+					// 	}
+					// }
+					break
+				}
+				if n > 0 {
+					data := make([]byte, n)
+					copy(data, buf[:n])
+					c.connections.broadcast(data)
+				}
+				if n == 0 {
+					log.Warn("Read zero bytes")
+				}
 			}
 		}
 	})

@@ -36,6 +36,7 @@ func Read() (Config, error) {
 
 	if err = yaml.Unmarshal([]byte(yml), &cfg); err != nil {
 		log.Warn("could not unmarshal yaml", "msg", err.Error())
+		return cfg, err
 	}
 
 	return cfg, nil
