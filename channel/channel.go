@@ -22,39 +22,16 @@ import (
 // --- Request Types ---
 //
 
-// PlayRequest represents a request to start playback. Implementations must
-// provide a request timestamp.
-type PlayRequest interface {
-	isPlayRequest()
-	Time() time.Time
+type playRequest struct{ reqTime time.Time }
+
+func (p playRequest) String() string {
+	return fmt.Sprintf("Play request -> %s", p.reqTime.Format(time.DateTime))
 }
 
-type playRequest struct {
-	reqTime time.Time
-}
+type stopRequest struct{ reqTime time.Time }
 
-func (p playRequest) isPlayRequest()  {}
-func (p playRequest) Time() time.Time { return p.reqTime }
-
-func playNow() *playRequest {
-	return &playRequest{reqTime: time.Now()}
-}
-
-// StopRequest represents a request to stop playback. Implementations must
-// provide a request timestamp.
-type StopRequest interface {
-	isStopRequest()
-	Time() time.Time
-}
-type stopRequest struct {
-	reqTime time.Time
-}
-
-func (s stopRequest) isStopRequest()  {}
-func (s stopRequest) Time() time.Time { return s.reqTime }
-
-func stopNow() *stopRequest {
-	return &stopRequest{reqTime: time.Now()}
+func (s stopRequest) String() string {
+	return fmt.Sprintf("Stop request -> %s", s.reqTime.Format(time.DateTime))
 }
 
 //
@@ -71,8 +48,8 @@ type Channel struct {
 	schedule    *schedule
 	connections *connectionList
 	ffmpegCmd   *exec.Cmd
-	playChan    chan PlayRequest
-	stopChan    chan StopRequest
+	playChan    chan playRequest
+	stopChan    chan stopRequest
 }
 
 // New creates a new Channel with the given name and a list of show file paths.
@@ -80,8 +57,8 @@ type Channel struct {
 // media files from.
 func New(name string, shows []string) *Channel {
 	strMap := make(map[chan []byte]struct{})
-	playChan := make(chan PlayRequest)
-	stopChan := make(chan StopRequest)
+	playChan := make(chan playRequest)
+	stopChan := make(chan stopRequest)
 
 	return &Channel{
 		name:     name,
@@ -106,14 +83,14 @@ func (c *Channel) Name() string {
 // When the last client disconnects, a stop request is issued.
 func (c *Channel) AddClient() (chan []byte, func()) {
 	if c.connections.Count() == 0 {
-		c.playChan <- playNow()
+		c.playChan <- playRequest{reqTime: time.Now()}
 	}
 
 	conn, cleanup := c.connections.add()
 	return conn, func() {
 		cleanup()
 		if c.connections.Count() == 0 {
-			c.stopChan <- stopNow()
+			c.stopChan <- stopRequest{reqTime: time.Now()}
 		}
 	}
 }
@@ -132,10 +109,10 @@ func (c *Channel) Start(ctx context.Context) error {
 	for {
 		select {
 		case startReq := <-c.playChan:
-			log.Debug("Start request recieved, starting ffmpeg", "channel", c.Name(), "requestTime", startReq.Time().Format(time.DateTime))
+			log.Debug("Start request recieved, starting ffmpeg", "channel", c.Name(), "request", startReq.String())
 			cancelPlayer = c.StartPlayer(childCtx)
 		case stopReq := <-c.stopChan:
-			log.Debug("Stop request recieved, starting ffmpeg", "channel", c.Name(), "requestTime", stopReq.Time().Format(time.DateTime))
+			log.Debug("Stop request recieved, starting ffmpeg", "channel", c.Name(), "request", stopReq.String())
 			cancelPlayer()
 		case <-ctx.Done():
 			log.Debug("[Start] outer context canceled, exiting channel", "channel", c.Name())
@@ -157,8 +134,8 @@ func (c *Channel) Start(ctx context.Context) error {
 //
 // Typical usage:
 //
-//   cancel := channel.StartPlayer(ctx)
-//   defer cancel() // ensure cleanup
+//	cancel := channel.StartPlayer(ctx)
+//	defer cancel() // ensure cleanup
 //
 // The caller is responsible for invoking the returned cancel function to
 // terminate playback, otherwise the goroutine will continue running until the
@@ -168,27 +145,26 @@ func (c *Channel) StartPlayer(ctx context.Context) func() {
 
 	go func() {
 		for {
-		log.Debug("[StartPlayer] Starting stream", "channel", c.Name())
-		c.streamFile(c.schedule.randomFile(), childCtx)
-		
-		select {
-		case <-childCtx.Done():
-			log.Debug("[StartPlayer] context is canceled, exiting")
-			return
-		default:
-			// Space out new files a little bit so clients can catch up
-			var DELAY = 2
-			for i := range DELAY {
-				log.Info(fmt.Sprintf("Waiting %d", DELAY-i))
-				time.Sleep(time.Second) // just a hunch
+			log.Debug("[StartPlayer] Starting stream", "channel", c.Name())
+			c.streamFile(c.schedule.randomFile(), childCtx)
+
+			select {
+			case <-childCtx.Done():
+				log.Debug("[StartPlayer] context is canceled, exiting")
+				return
+			default:
+				// Space out new files a little bit so clients can catch up
+				var DELAY = 2
+				for i := range DELAY {
+					log.Info(fmt.Sprintf("Waiting %d", DELAY-i))
+					time.Sleep(time.Second) // just a hunch
+				}
 			}
 		}
-	}
 	}()
 
 	return cancelCtx
 }
-
 
 // Useful for debugging but not something I actually want to expose
 
