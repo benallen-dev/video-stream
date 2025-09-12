@@ -64,7 +64,7 @@ func main() {
 	// Run the webserver
 	wg.Go(func() {
 		log.Debug("Starting http server")
-		server.Start(channels)
+		server.Start(ctx, channels)
 		wg.Done()
 	})
 

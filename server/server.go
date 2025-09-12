@@ -1,15 +1,18 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"time"
 	"strings"
 
 	"video-stream/channel"
 	"video-stream/log"
 )
 
-func Start(chs []*channel.Channel) {
+func Start(ctx context.Context, chs []*channel.Channel) {
 	// Static file hosting from ./public
 	fs := http.FileServer(http.Dir("public"))
 	http.Handle("/", fs)
@@ -63,11 +66,31 @@ func Start(chs []*channel.Channel) {
 		w.Write([]byte(strings.Join(playlist, "\n")))
 	})
 
-	log.Info("Serving on :8080")
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		log.Fatal("Error in HTTP server", "msg", err.Error())
+	server := &http.Server{
+		Addr: ":8080",
 	}
+
+	go func() {
+        if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+            log.Fatalf("HTTP server error: %v", err)
+        }
+        log.Info("Stopped serving new connections.")
+    }()
+    <-ctx.Done()
+
+    shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+    defer shutdownRelease()
+
+    if err := server.Shutdown(shutdownCtx); err != nil {
+        log.Fatalf("HTTP shutdown error: %v", err)
+    }
+    log.Info("Graceful shutdown complete.")
+
+	// log.Info("Serving on :8080")
+	// err := http.ListenAndServe(":8080", nil)
+	// if err != nil {
+	// 	log.Fatal("Error in HTTP server", "msg", err.Error())
+	// }
 
 	// TODO: Add graceful shutdown
 }

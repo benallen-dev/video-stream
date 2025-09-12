@@ -90,11 +90,16 @@ func (c *Channel) AddClient() (chan []byte, func()) {
 	conn, cleanup := c.connections.add()
 	return conn, func() {
 		cleanup()
-		c.stopChan <- stopNow()
+		if c.connections.Count() == 0 {
+			c.stopChan <- stopNow()
+		}
 	}
 }
 
-func (c *Channel) Start(ctx context.Context) {
+func (c *Channel) Start(ctx context.Context) error {
+	childCtx, cancelCtx := context.WithCancel(ctx)
+	defer cancelCtx()
+
 	// TODO: Make work properly
 
 	// Hang out until AddClient is called or parent context is canceled
@@ -107,9 +112,9 @@ outer:
 
 			break outer
 
-		case playReq := <-c.foo:
-			log.Info("Play requested", "request time", playReq.reqTime.Format(time.DateTime))
-			c.streamFile(c.schedule.randomFile())
+		case playReq := <-c.playChan:
+			log.Info("Play requested", "request time", playReq.Time().Format(time.DateTime))
+			c.streamFile(c.schedule.randomFile(), childCtx)
 
 			// Space out new files a little bit so clients can catch up
 			var DELAY = 2
@@ -119,6 +124,8 @@ outer:
 			}
 		}
 	}
+
+	return nil
 }
 
 func (c *Channel) streamLoop() {
