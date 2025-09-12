@@ -41,7 +41,7 @@ func main() {
 	// Read config and build "channels"
 	cfg, err := config.Read()
 	if err != nil {
-		log.Fatal("Could not read config", "msg", err.Error())
+		log.Fatal("Could not read config:", "msg", err.Error())
 	}
 
 	log.SetLevel(cfg.LogLevel)

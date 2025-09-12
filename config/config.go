@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"errors"
 	"path"
 
 	yaml "github.com/goccy/go-yaml"
@@ -25,14 +26,23 @@ func getConfigFilePath() (string, error) {
 }
 
 func Read() (Config, error) {
+	cfg := Config{}
+
 	cfgFile, err := getConfigFilePath()
 	if err != nil {
-		return Config{}, err
+		return cfg, err
 	}
+
+	// Stat the file
+	if _, err := os.Stat(cfgFile); errors.Is(err, os.ErrNotExist) {
+		log.Warnf("File '%s' does not exist, cannot read config!", cfgFile)
+		return cfg, err
+		// file doesn't exist
+	}
+
 	
 	yml, err := os.ReadFile(cfgFile)
 
-	cfg := Config{}
 
 	if err = yaml.Unmarshal([]byte(yml), &cfg); err != nil {
 		log.Warn("could not unmarshal yaml", "msg", err.Error())
