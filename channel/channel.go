@@ -23,6 +23,10 @@ type playRequest struct {
 func (p playRequest) isPlayRequest()  {}
 func (p playRequest) Time() time.Time { return p.reqTime }
 
+func playNow() *playRequest {
+	return &playRequest{reqTime: time.Now()}
+}
+
 type StopRequest interface {
 	isStopRequest()
 	Time() time.Time
@@ -33,10 +37,6 @@ type stopRequest struct {
 
 func (s stopRequest) isStopRequest()  {}
 func (s stopRequest) Time() time.Time { return s.reqTime }
-
-func playNow() *playRequest {
-	return &playRequest{reqTime: time.Now()}
-}
 
 func stopNow() *stopRequest {
 	return &stopRequest{reqTime: time.Now()}
@@ -77,12 +77,6 @@ func (c *Channel) Name() string {
 }
 
 func (c *Channel) AddClient() (chan []byte, func()) {
-	// Are we the first?
-	//   If so, get the schedule
-	//   Figure out the offset
-	//   Start ffmpeg
-	// In all cases
-	//   Register a stream with the connectionlist
 	if c.connections.Count() == 0 {
 		c.playChan <- playNow()
 	}
@@ -100,22 +94,36 @@ func (c *Channel) Start(ctx context.Context) error {
 	childCtx, cancelCtx := context.WithCancel(ctx)
 	defer cancelCtx()
 
-	// TODO: Make work properly
+	var cancelPlayer func()
 
-	// Hang out until AddClient is called or parent context is canceled
-	// Start streaming media until media context or parent context is canceled
-	// GOTO 10
-outer:
 	for {
-		select { // block until recieving a signal
+		select {
+		case startReq := <-c.playChan:
+			log.Debug("Start request recieved, starting ffmpeg", "channel", c.Name(), "requestTime", startReq.Time().Format(time.DateTime))
+			cancelPlayer = c.StartPlayer(childCtx)
+		case stopReq := <-c.stopChan:
+			log.Debug("Stop request recieved, starting ffmpeg", "channel", c.Name(), "requestTime", stopReq.Time().Format(time.DateTime))
+			cancelPlayer()
 		case <-ctx.Done():
+			log.Debug("[Start] outer context canceled, exiting channel", "channel", c.Name())
+			return nil
+		}
+	}
+}
 
-			break outer
+func (c *Channel) StartPlayer(ctx context.Context) func() {
+	childCtx, cancelCtx := context.WithCancel(ctx)
 
-		case playReq := <-c.playChan:
-			log.Info("Play requested", "request time", playReq.Time().Format(time.DateTime))
-			c.streamFile(c.schedule.randomFile(), childCtx)
-
+	go func() {
+		for {
+		log.Debug("[StartPlayer] Starting stream", "channel", c.Name())
+		c.streamFile(c.schedule.randomFile(), childCtx)
+		
+		select {
+		case <-childCtx.Done():
+			log.Debug("[StartPlayer] context is canceled, exiting")
+			return
+		default:
 			// Space out new files a little bit so clients can catch up
 			var DELAY = 2
 			for i := range DELAY {
@@ -124,14 +132,11 @@ outer:
 			}
 		}
 	}
+	}()
 
-	return nil
+	return cancelCtx
 }
 
-func (c *Channel) streamLoop() {
-	//
-
-}
 
 // Useful for debugging but not something I actually want to expose
 
