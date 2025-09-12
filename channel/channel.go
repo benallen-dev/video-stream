@@ -1,3 +1,10 @@
+// Package channel provides a TV-like streaming abstraction where media files
+// are broadcast continuously to multiple clients. Instead of analogue signals,
+// it uses ffmpeg to transcode media into MPEG-TS streams and pipes them into Go,
+// where they can be consumed by many clients simultaneously.
+//
+// A Channel maintains a schedule of media files, manages client connections,
+// and automatically starts or stops playback based on client demand.
 package channel
 
 import (
@@ -11,6 +18,12 @@ import (
 	"video-stream/log"
 )
 
+//
+// --- Request Types ---
+//
+
+// PlayRequest represents a request to start playback. Implementations must
+// provide a request timestamp.
 type PlayRequest interface {
 	isPlayRequest()
 	Time() time.Time
@@ -27,6 +40,8 @@ func playNow() *playRequest {
 	return &playRequest{reqTime: time.Now()}
 }
 
+// StopRequest represents a request to stop playback. Implementations must
+// provide a request timestamp.
 type StopRequest interface {
 	isStopRequest()
 	Time() time.Time
@@ -42,6 +57,10 @@ func stopNow() *stopRequest {
 	return &stopRequest{reqTime: time.Now()}
 }
 
+//
+// --- Channel ---
+//
+
 // Channel behaves like an old school TV channel, except it's streaming MPEG-TS
 // instead of analogue TV signals.
 //
@@ -56,6 +75,9 @@ type Channel struct {
 	stopChan    chan StopRequest
 }
 
+// New creates a new Channel with the given name and a list of show file paths.
+// The channel maintains its own client connection list and a schedule to pick
+// media files from.
 func New(name string, shows []string) *Channel {
 	strMap := make(map[chan []byte]struct{})
 	playChan := make(chan PlayRequest)
@@ -76,6 +98,12 @@ func (c *Channel) Name() string {
 	return c.name
 }
 
+// AddClient registers a new client for the channel. It returns a byte stream
+// channel for receiving MPEG-TS data and a cleanup function to call when the
+// client disconnects.
+//
+// If this is the first client, the channel automatically issues a play request.
+// When the last client disconnects, a stop request is issued.
 func (c *Channel) AddClient() (chan []byte, func()) {
 	if c.connections.Count() == 0 {
 		c.playChan <- playNow()
@@ -90,6 +118,11 @@ func (c *Channel) AddClient() (chan []byte, func()) {
 	}
 }
 
+// Start runs the channel’s event loop. It listens for play and stop requests
+// and launches or terminates the player accordingly.
+//
+// Start blocks until the provided context is canceled. Only one goroutine
+// should call Start for a given Channel instance.
 func (c *Channel) Start(ctx context.Context) error {
 	childCtx, cancelCtx := context.WithCancel(ctx)
 	defer cancelCtx()
@@ -111,6 +144,25 @@ func (c *Channel) Start(ctx context.Context) error {
 	}
 }
 
+// StartPlayer launches a background goroutine that continuously streams files
+// from the channel's schedule until the provided context is canceled.
+//
+// Each iteration picks a random file from the channel's schedule and streams it
+// with streamFile. After a file finishes streaming, the loop waits briefly
+// (currently two seconds, logged as a countdown) to give clients time to catch up
+// before starting the next file.
+//
+// The returned function is a cancel function that, when called, will stop the
+// background goroutine and exit the player loop gracefully.
+//
+// Typical usage:
+//
+//   cancel := channel.StartPlayer(ctx)
+//   defer cancel() // ensure cleanup
+//
+// The caller is responsible for invoking the returned cancel function to
+// terminate playback, otherwise the goroutine will continue running until the
+// parent context expires.
 func (c *Channel) StartPlayer(ctx context.Context) func() {
 	childCtx, cancelCtx := context.WithCancel(ctx)
 
@@ -153,6 +205,13 @@ func (c *Channel) Count() int {
 	return c.connections.Count()
 }
 
+// streamFile runs ffmpeg to stream a single media file to all connected
+// clients. It blocks until either the file finishes streaming or the provided
+// context is canceled.
+//
+// ffmpeg’s stdout is piped into Go and broadcast to all connections. If the
+// context is canceled, the ffmpeg process is killed. Any errors while reading
+// from ffmpeg’s output are logged but not returned.
 func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 
 	var audioMap string
