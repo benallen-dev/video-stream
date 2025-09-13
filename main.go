@@ -102,7 +102,7 @@ func watchClientCount(chs []*channel.Channel) {
 			if ch.Count() != 1 {
 				s = "s"
 			}
-			out += fmt.Sprintf("\n\t"+ch.Name()+": \x1b[%dG%d client%s", w+8, ch.Count(), s) // TODO: Maybe we can get rid of count
+			out += fmt.Sprintf("\n\t"+ch.Name()+": \x1b[%dG%d client%s", w+8, ch.Count(), s)
 		}
 		log.Debug(out)
 

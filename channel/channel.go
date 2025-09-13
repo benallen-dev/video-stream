@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"os/exec"
 	"path"
-	"sync"
 	"time"
 
 	"video-stream/log"
@@ -25,13 +24,13 @@ import (
 type playRequest struct{ reqTime time.Time }
 
 func (p playRequest) String() string {
-	return fmt.Sprintf("Play request -> %s", p.reqTime.Format(time.DateTime))
+	return fmt.Sprintf("Play request @ %s", p.reqTime.Format(time.DateTime))
 }
 
 type stopRequest struct{ reqTime time.Time }
 
 func (s stopRequest) String() string {
-	return fmt.Sprintf("Stop request -> %s", s.reqTime.Format(time.DateTime))
+	return fmt.Sprintf("Stop request @ %s", s.reqTime.Format(time.DateTime))
 }
 
 //
@@ -75,6 +74,10 @@ func (c *Channel) Name() string {
 	return c.name
 }
 
+func (c *Channel) Count() int {
+	return c.connections.Count()
+}
+
 // AddClient registers a new client for the channel. It returns a byte stream
 // channel for receiving MPEG-TS data and a cleanup function to call when the
 // client disconnects.
@@ -110,7 +113,7 @@ func (c *Channel) Start(ctx context.Context) error {
 		select {
 		case startReq := <-c.playChan:
 			log.Debug("Start request recieved, starting ffmpeg", "channel", c.Name(), "request", startReq.String())
-			cancelPlayer = c.StartPlayer(childCtx)
+			cancelPlayer = c.startPlayer(childCtx)
 		case stopReq := <-c.stopChan:
 			log.Debug("Stop request recieved, starting ffmpeg", "channel", c.Name(), "request", stopReq.String())
 			cancelPlayer()
@@ -121,7 +124,7 @@ func (c *Channel) Start(ctx context.Context) error {
 	}
 }
 
-// StartPlayer launches a background goroutine that continuously streams files
+// startPlayer launches a background goroutine that continuously streams files
 // from the channel's schedule until the provided context is canceled.
 //
 // Each iteration picks a random file from the channel's schedule and streams it
@@ -134,54 +137,34 @@ func (c *Channel) Start(ctx context.Context) error {
 //
 // Typical usage:
 //
-//	cancel := channel.StartPlayer(ctx)
+//	cancel := channel.startPlayer(ctx)
 //	defer cancel() // ensure cleanup
 //
 // The caller is responsible for invoking the returned cancel function to
 // terminate playback, otherwise the goroutine will continue running until the
 // parent context expires.
-func (c *Channel) StartPlayer(ctx context.Context) func() {
+func (c *Channel) startPlayer(ctx context.Context) func() {
 	var DELAY = 2
 	childCtx, cancelCtx := context.WithCancel(ctx)
 
 	go func() {
 		for {
-			log.Debug("[StartPlayer] Starting stream", "channel", c.Name())
+			log.Debug("[startPlayer] Starting stream", "channel", c.Name())
 			c.streamFile(c.schedule.randomFile(), childCtx)
-			log.Debug("[StartPlayer] Stream finished", "channel", c.Name())
+			log.Debug("[startPlayer] Stream finished", "channel", c.Name())
 
 			select {
 			case <-childCtx.Done():
-				log.Debug("[StartPlayer] context is canceled, exiting")
+				log.Debug("[startPlayer] context is canceled, exiting")
 				return
 			default:
-				log.Debug("[StartPlayer] waiting %d seconds before starting next file", DELAY)
+				log.Debug("[startPlayer] waiting %d seconds before starting next file", DELAY)
 				time.Sleep(time.Duration(2*time.Second))
-				// // Space out new files a little bit so clients can catch up
-				// for i := range DELAY {
-				// 	log.Info(fmt.Sprintf("Waiting %d", DELAY-i))
-				// 	time.Sleep(time.Second) // just a hunch
-				// }
 			}
 		}
 	}()
 
 	return cancelCtx
-}
-
-// Useful for debugging but not something I actually want to expose
-
-func (c *Channel) String() string {
-	s := ""
-	if c.connections.Count() != 1 {
-		s = "s"
-	}
-
-	return fmt.Sprintf("Channel: %s - %d client%s", c.name, c.connections.Count(), s)
-}
-
-func (c *Channel) Count() int {
-	return c.connections.Count()
 }
 
 // streamFile runs ffmpeg to stream a single media file to all connected
@@ -256,19 +239,25 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 		log.Fatal("could not run ffmpeg command", "error", err.Error())
 	}
 
-	var innerWg sync.WaitGroup
+
+	// Instead of using waitgroups, just use a done signal
+	streamDone := make(chan struct{})
+
+	// var innerWg sync.WaitGroup
 
 	// Pump ffmpeg → broadcast
-	innerWg.Go(func() {
+	// innerWg.Go(func() {
+	go func() {
 		buf := make([]byte, 4096)
 
+	streamloop:
 		for {
 			select {
 			case <-ctx.Done():
 				// kill ffmpeg command and return
 				log.Debug("streamFile context canceled, killing ffmpeg and returning", "channel", c.Name())
 				cmd.Process.Kill()
-				return
+				break streamloop
 			default:
 				n, err := stdout.Read(buf)
 				if err != nil {
@@ -283,7 +272,7 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 					// 		break
 					// 	}
 					// }
-					break
+					break streamloop
 				}
 				if n > 0 {
 					data := make([]byte, n)
@@ -295,8 +284,12 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 				}
 			}
 		}
-	})
 
-	innerWg.Wait()
+		streamDone <- struct{}{}
+	}()
+
+	log.Debug("[streamFile] waiting for streamDone signal", "channel", c.Name())
+	<-streamDone
+	log.Debug("[streamFile] received streamDone signal, end of streamFile", "channel", c.Name())
 
 }
