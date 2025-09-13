@@ -34,6 +34,8 @@ func Start(ctx context.Context, chs []*channel.Channel) {
 			fmt.Sprintf(`http://%s:8080%s`, ip, route),
 		)
 
+
+		// TODO: Handle dropped connections to avoid leaving ffmpeg running when clients time out
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 			log.Info("client connected", "route", route, "channelName", ch.Name(), "client", r.RemoteAddr)
 

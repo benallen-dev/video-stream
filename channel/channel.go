@@ -1,10 +1,3 @@
-// Package channel provides a TV-like streaming abstraction where media files
-// are broadcast continuously to multiple clients. Instead of analogue signals,
-// it uses ffmpeg to transcode media into MPEG-TS streams and pipes them into Go,
-// where they can be consumed by many clients simultaneously.
-//
-// A Channel maintains a schedule of media files, manages client connections,
-// and automatically starts or stops playback based on client demand.
 package channel
 
 import (
@@ -17,10 +10,6 @@ import (
 	"video-stream/log"
 )
 
-//
-// --- Request Types ---
-//
-
 type playRequest struct{ reqTime time.Time }
 
 func (p playRequest) String() string {
@@ -32,10 +21,6 @@ type stopRequest struct{ reqTime time.Time }
 func (s stopRequest) String() string {
 	return fmt.Sprintf("Stop request @ %s", s.reqTime.Format(time.DateTime))
 }
-
-//
-// --- Channel ---
-//
 
 // Channel behaves like an old school TV channel, except it's streaming MPEG-TS
 // instead of analogue TV signals.
@@ -77,12 +62,6 @@ func (c *Channel) Count() int {
 	return c.connections.Count()
 }
 
-// AddClient registers a new client for the channel. It returns a byte stream
-// channel for receiving MPEG-TS data and a cleanup function to call when the
-// client disconnects.
-//
-// If this is the first client, the channel automatically issues a play request.
-// When the last client disconnects, a stop request is issued.
 func (c *Channel) AddClient() (chan []byte, func()) {
 	if c.connections.Count() == 0 {
 		c.playChan <- playRequest{reqTime: time.Now()}
@@ -97,9 +76,6 @@ func (c *Channel) AddClient() (chan []byte, func()) {
 	}
 }
 
-// Start runs the channel’s event loop. It listens for play and stop requests
-// and launches or terminates the player accordingly.
-//
 // Start blocks until the provided context is canceled. Only one goroutine
 // should call Start for a given Channel instance.
 func (c *Channel) Start(ctx context.Context) error {
@@ -126,18 +102,8 @@ func (c *Channel) Start(ctx context.Context) error {
 // startPlayer launches a background goroutine that continuously streams files
 // from the channel's schedule until the provided context is canceled.
 //
-// Each iteration picks a random file from the channel's schedule and streams it
-// with streamFile. After a file finishes streaming, the loop waits briefly
-// (currently two seconds, logged as a countdown) to give clients time to catch up
-// before starting the next file.
-//
 // The returned function is a cancel function that, when called, will stop the
 // background goroutine and exit the player loop gracefully.
-//
-// Typical usage:
-//
-//	cancel := channel.startPlayer(ctx)
-//	defer cancel() // ensure cleanup
 //
 // The caller is responsible for invoking the returned cancel function to
 // terminate playback, otherwise the goroutine will continue running until the
@@ -166,13 +132,7 @@ func (c *Channel) startPlayer(ctx context.Context) func() {
 	return cancelCtx
 }
 
-// streamFile runs ffmpeg to stream a single media file to all connected
-// clients. It blocks until either the file finishes streaming or the provided
-// context is canceled.
-//
-// ffmpeg’s stdout is piped into Go and broadcast to all connections. If the
-// context is canceled, the ffmpeg process is killed. Any errors while reading
-// from ffmpeg’s output are logged but not returned.
+// Starts an ffmpeg process that publishes mpeg-ts data to all connections
 func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 
 	var audioMap string
@@ -238,13 +198,8 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 	}
 
 
-	// Instead of using waitgroups, just use a done signal
 	streamDone := make(chan struct{})
 
-	// var innerWg sync.WaitGroup
-
-	// Pump ffmpeg → broadcast
-	// innerWg.Go(func() {
 	go func() {
 		buf := make([]byte, 4096)
 
@@ -289,5 +244,4 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 	log.Debug("[streamFile] waiting for streamDone signal", "channel", c.Name())
 	<-streamDone
 	log.Debug("[streamFile] received streamDone signal, end of streamFile", "channel", c.Name())
-
 }
