@@ -46,7 +46,6 @@ type Channel struct {
 	name        string
 	schedule    *schedule
 	connections *connectionList
-	ffmpegCmd   *exec.Cmd
 	playChan    chan playRequest
 	stopChan    chan stopRequest
 }
@@ -216,7 +215,6 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 	}
 
 	cmd := exec.Command("ffmpeg", ffmpegArgs...)
-	c.ffmpegCmd = cmd
 
 	dur, err := f.Duration()
 	if err != nil {
