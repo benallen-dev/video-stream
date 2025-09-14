@@ -37,15 +37,17 @@ func Start(ctx context.Context, chs []*channel.Channel) {
 
 		// TODO: Handle dropped connections to avoid leaving ffmpeg running when clients time out
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
-			log.Info("client connected", "route", route, "channelName", ch.Name(), "client", r.RemoteAddr)
+			log.Info("[HTTP Server] client connected", "route", route, "channelName", ch.Name(), "client", r.RemoteAddr)
 
 			w.Header().Set("Content-Type", "video/MP2T")
 
 			// Add Connection, get datastream and cleanup fn
-			stream, cleanup := ch.AddClient()
+			stream, cleanup := ch.AddClient() 
+
+			// TODO: cleanup doesn't appear to be working anymore
 
 			defer func() {
-			log.Info("client disconnected", "route", route, "channelName", ch.Name(), "client", r.RemoteAddr)
+			log.Info("[HTTP Server] client disconnected", "route", route, "channelName", ch.Name(), "client", r.RemoteAddr)
 				cleanup()
 			}()
 
@@ -63,7 +65,7 @@ func Start(ctx context.Context, chs []*channel.Channel) {
 
 	// Simple playlist
 	http.HandleFunc("/playlist.m3u", func(w http.ResponseWriter, r *http.Request) {
-		log.Info("client requested playlist.m3u", "client", r.RemoteAddr)
+		log.Info("[HTTP Server] client requested playlist.m3u", "client", r.RemoteAddr)
 		w.Header().Set("Content-Type", "application/x-mpegURL")
 		w.Write([]byte(strings.Join(playlist, "\n")))
 	})
@@ -72,11 +74,12 @@ func Start(ctx context.Context, chs []*channel.Channel) {
 		Addr: ":8080",
 	}
 
+	log.Info("[HTTP Server] starting http server", "address", server.Addr)
 	go func() {
         if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-            log.Fatalf("HTTP server error: %v", err)
+            log.Fatalf("[HTTP Server] server error: %v", err)
         }
-        log.Info("Stopped serving new connections.")
+        log.Info("[HTTP Server] stopped serving new connections")
     }()
     <-ctx.Done()
 
@@ -84,15 +87,7 @@ func Start(ctx context.Context, chs []*channel.Channel) {
     defer shutdownRelease()
 
     if err := server.Shutdown(shutdownCtx); err != nil {
-        log.Fatalf("HTTP shutdown error: %v", err)
+        log.Fatalf("[HTTP Server] shutdown error: %v", err)
     }
-    log.Info("Graceful shutdown complete.")
-
-	// log.Info("Serving on :8080")
-	// err := http.ListenAndServe(":8080", nil)
-	// if err != nil {
-	// 	log.Fatal("Error in HTTP server", "msg", err.Error())
-	// }
-
-	// TODO: Add graceful shutdown
+    log.Info("[HTTP Server] graceful shutdown complete.")
 }

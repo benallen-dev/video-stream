@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path"
+	"strconv"
 	"time"
 
 	"video-stream/log"
@@ -69,8 +70,10 @@ func (c *Channel) AddClient() (chan []byte, func()) {
 
 	conn, cleanup := c.connections.add()
 	return conn, func() {
-		cleanup()
-		if c.connections.Count() == 0 {
+		conns := cleanup() // cleanup returns number of connections after removal
+		log.Debug("[AddClient::cleanup] called cleanup", "remaining_connections", strconv.Itoa(conns))
+		if conns == 0 {
+			log.Debug("[AddClient::cleanup] sending stopRequest")
 			c.stopChan <- stopRequest{reqTime: time.Now()}
 		}
 	}
@@ -123,7 +126,7 @@ func (c *Channel) startPlayer(ctx context.Context) func() {
 				log.Debug("[startPlayer] context is canceled, exiting")
 				return
 			default:
-				log.Debug("[startPlayer] waiting %d seconds before starting next file", DELAY)
+				log.Debugf("[startPlayer] waiting %d seconds before starting next file", DELAY)
 				time.Sleep(time.Duration(2*time.Second))
 			}
 		}

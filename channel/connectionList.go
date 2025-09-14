@@ -10,19 +10,20 @@ type connectionList struct {
 	streams map[chan []byte]struct{}
 }
 
-func (cl *connectionList) add() (chan []byte, func()) {
+func (cl *connectionList) add() (chan []byte, func() int) {
 	ch := make(chan []byte, 4096)
 
 	cl.mu.Lock()
 	cl.streams[ch] = struct{}{}
 	cl.mu.Unlock()
 
-	cleanupFn := func() {
+	cleanupFn := func() int {
 		log.Info("removing stream from channel")
 		cl.mu.Lock()
 		delete(cl.streams, ch)
 		close(ch)
 		cl.mu.Unlock()
+		return len(cl.streams)
 	}
 
 	return ch, cleanupFn

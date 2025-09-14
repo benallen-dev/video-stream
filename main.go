@@ -41,7 +41,7 @@ func main() {
 	// Read config and build "channels"
 	cfg, err := config.Read()
 	if err != nil {
-		log.Fatal("Could not read config:", "msg", err.Error())
+		log.Fatal("[main] Could not read config:", "msg", err.Error())
 	}
 
 	log.SetLevel(cfg.LogLevel)
@@ -62,7 +62,6 @@ func main() {
 
 	// Run the webserver
 	wg.Go(func() {
-		log.Debug("Starting http server")
 		server.Start(ctx, channels)
 	})
 
@@ -77,9 +76,9 @@ func main() {
 	go func() {
 		done := make(chan os.Signal, 1)
   		signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
-  		fmt.Println("Blocking, press ctrl+c to continue...")
+  		log.Info("[main] waiting until SIGINT")
   		<-done  // Will block here until user hits ctrl+c
-		log.Info("Received interrupt")
+		log.Info("[main] received SIGINT")
   		ctxCancel()
 	}()
 
