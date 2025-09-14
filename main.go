@@ -16,16 +16,11 @@ import (
 )
 
 // TODO:
-// - Logging:
-//  - Add context for which channel the log originates from
 // - Scheduling
 //   - Generate schedule when starting
 //   - Periodically extend schedule
 //   - Use schedule when deciding what to play
 // - Optimisation
-//   - Don't start ffmpeg streaming media to stdout until a client connects
-//   - Add cancellation to ffmpeg goroutine
-//   - Graceful shutdown on quit
 //   - Dockerise so I can run this on unraid
 // - User Interface
 //   - Add static HTTP routes for channel icons etc
