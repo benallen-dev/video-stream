@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 	"strings"
+	"time"
 
 	"video-stream/channel"
 	"video-stream/log"
@@ -34,30 +34,43 @@ func Start(ctx context.Context, chs []*channel.Channel) {
 			fmt.Sprintf(`http://%s:8080%s`, ip, route),
 		)
 
-
-		// TODO: Handle dropped connections to avoid leaving ffmpeg running when clients time out
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 			log.Info("[HTTP Server] client connected", "route", route, "channelName", ch.Name(), "client", r.RemoteAddr)
 
 			w.Header().Set("Content-Type", "video/MP2T")
 
 			// Add Connection, get datastream and cleanup fn
-			stream, cleanup := ch.AddClient() 
-
-			// TODO: cleanup doesn't appear to be working anymore
+			stream, cleanup := ch.AddClient()
 
 			defer func() {
-			log.Info("[HTTP Server] client disconnected", "route", route, "channelName", ch.Name(), "client", r.RemoteAddr)
+				log.Info("[HTTP Server] client disconnected", "route", route, "channelName", ch.Name(), "client", r.RemoteAddr)
 				cleanup()
 			}()
 
 			// stream to this client
 			for data := range stream {
-				if _, err := w.Write(data); err != nil {
+				select {
+				case <-ctx.Done(): // If the server is shutting down
+					// Close TCP connection
+					hj, ok := w.(http.Hijacker)
+					if !ok {
+						log.Error("[HandleFunc] webserver doesn't support hijacking", "route", route)
+						return
+					}
+					conn, _, err := hj.Hijack()
+					if err != nil {
+						log.Error("[HandleFunc] failed to hijack TCP connection", "route", route)
+					}
+					conn.Close()
+
 					return
-				}
-				if f, ok := w.(http.Flusher); ok {
-					f.Flush()
+				default:
+					if _, err := w.Write(data); err != nil {
+						return
+					}
+					if f, ok := w.(http.Flusher); ok {
+						f.Flush()
+					}
 				}
 			}
 		})
@@ -76,18 +89,18 @@ func Start(ctx context.Context, chs []*channel.Channel) {
 
 	log.Info("[HTTP Server] starting http server", "address", server.Addr)
 	go func() {
-        if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-            log.Fatalf("[HTTP Server] server error: %v", err)
-        }
-        log.Info("[HTTP Server] stopped serving new connections")
-    }()
-    <-ctx.Done()
+		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("[HTTP Server] server error: %v", err)
+		}
+		log.Info("[HTTP Server] stopped serving new connections")
+	}()
+	<-ctx.Done()
 
-    shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
-    defer shutdownRelease()
+	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownRelease()
 
-    if err := server.Shutdown(shutdownCtx); err != nil {
-        log.Fatalf("[HTTP Server] shutdown error: %v", err)
-    }
-    log.Info("[HTTP Server] graceful shutdown complete.")
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("[HTTP Server] shutdown error: %v", err)
+	}
+	log.Info("[HTTP Server] graceful shutdown complete.")
 }

@@ -90,13 +90,13 @@ func (c *Channel) Start(ctx context.Context) error {
 	for {
 		select {
 		case startReq := <-c.playChan:
-			log.Debug("Start request recieved, starting ffmpeg", "channel", c.Name(), "request", startReq.String())
+			log.Info("[channel loop] start request recieved, starting player", "channel", c.Name(), "request", startReq.String())
 			cancelPlayer = c.startPlayer(childCtx)
 		case stopReq := <-c.stopChan:
-			log.Debug("Stop request recieved, starting ffmpeg", "channel", c.Name(), "request", stopReq.String())
+			log.Info("[channel loop] stop request recieved, cancelling player", "channel", c.Name(), "request", stopReq.String())
 			cancelPlayer()
 		case <-ctx.Done():
-			log.Debug("[Start] outer context canceled, exiting channel", "channel", c.Name())
+			log.Info("[channel loop] outer context canceled, exiting channel", "channel", c.Name())
 			return nil
 		}
 	}
@@ -122,8 +122,11 @@ func (c *Channel) startPlayer(ctx context.Context) func() {
 			log.Debug("[startPlayer] Stream finished", "channel", c.Name())
 
 			select {
+			case <-ctx.Done():
+				log.Debug("[startPlayer] parent context is canceled, exiting")
+				return
 			case <-childCtx.Done():
-				log.Debug("[startPlayer] context is canceled, exiting")
+				log.Debug("[startPlayer] child context is canceled, exiting")
 				return
 			default:
 				log.Debugf("[startPlayer] waiting %d seconds before starting next file", DELAY)
@@ -181,13 +184,13 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 
 	dur, err := f.Duration()
 	if err != nil {
-		log.Warn("couldn't get file duration", "error", err.Error())
+		log.Warn("[streamFile] couldn't get file duration", "error", err.Error(), "channel", c.Name())
 	}
-	log.Info("Running ffmpeg", "file", path.Base(f.path), "duration", dur)
+	log.Info("[streamFile] Running ffmpeg", "file", path.Base(f.path), "duration", dur, "channel", c.Name())
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal("could not create stdout pipe", "error", err.Error())
+		log.Fatal("[streamFile] could not create stdout pipe", "error", err.Error(), "channel", c.Name())
 	}
 
 	// TODO: Figure out how to get output from stderr for debugging without blocking
@@ -197,9 +200,8 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 	// }
 
 	if err := cmd.Start(); err != nil {
-		log.Fatal("could not run ffmpeg command", "error", err.Error())
+		log.Fatal("[streamFile] could not run ffmpeg command", "error", err.Error(), "channel", c.Name())
 	}
-
 
 	streamDone := make(chan struct{})
 
@@ -211,14 +213,14 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				// kill ffmpeg command and return
-				log.Debug("streamFile context canceled, killing ffmpeg and returning", "channel", c.Name())
+				log.Debug("[streamFile] context canceled, killing ffmpeg and returning", "channel", c.Name())
 				cmd.Process.Kill()
 				break streamloop
 			default:
 				n, err := stdout.Read(buf)
 				if err != nil {
-					log.Info("ffmpeg ended:", "reason", err)
-					log.Debug(cmd.String())
+					log.Info("[streamFile] ffmpeg ended:", "reason", err, "channel", c.Name())
+					// log.Debug(cmd.String())
 
 					// for {
 					// 	n, err := stderr.Read(buf)
@@ -234,9 +236,6 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 					data := make([]byte, n)
 					copy(data, buf[:n])
 					c.connections.broadcast(data)
-				}
-				if n == 0 {
-					log.Warn("Read zero bytes")
 				}
 			}
 		}
