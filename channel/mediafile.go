@@ -15,6 +15,7 @@ type mediafile struct {
 }
 
 func (mf mediafile) Duration() (string, error) {
+	// TODO add cache
 
 	cmd := exec.Command(
 		"ffprobe",
@@ -35,9 +36,10 @@ func (mf mediafile) Duration() (string, error) {
 		return "", fmt.Errorf("failed to parse duration: %w", err)
 	}
 
+	// TODO: Don't use string representation but time.Duration
 	minutes := int(durationSec) / 60
 	seconds := int(durationSec) % 60
-	return fmt.Sprintf("%02d:%02d", minutes, seconds), nil
+	return fmt.Sprintf("%02dm%02ds", minutes, seconds), nil
 }
 
 

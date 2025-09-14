@@ -82,6 +82,20 @@ func (c *Channel) AddClient() (chan []byte, func()) {
 // Start blocks until the provided context is canceled. Only one goroutine
 // should call Start for a given Channel instance.
 func (c *Channel) Start(ctx context.Context) error {
+	// Generate the schedule
+	generated, err := c.schedule.generate()
+	if err != nil {
+		log.Error("Could not generate schedule", "channel", c.Name(), "error", err.Error())
+		return err
+	}
+
+
+	for _, g := range generated {
+		log.Debug(g.path)
+	}
+
+	log.Info("Schedule generation complete", "channel", c.Name())
+
 	childCtx, cancelCtx := context.WithCancel(ctx)
 	defer cancelCtx()
 
@@ -156,7 +170,7 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 		"-avoid_negative_ts", "make_zero",
 
 		// Get input
-		// "-sseof", "-10", // start N seconds from the end
+		"-sseof", "-10", // start N seconds from the end
 		// "-ss", "45", // skip the first 45 seconds
 		"-re", // throttle to realtime
 		"-i", f.path,
