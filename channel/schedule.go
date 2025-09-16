@@ -2,6 +2,8 @@ package channel
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -59,7 +61,7 @@ func findMedia(dirs []string) (map[string][]mediafile, error) {
 		showName := path.Base(dir)
 		out[showName] = make([]mediafile, len(files))
 		for i, f := range files {
-			out[showName][i] = mediafile{ path: f }
+			out[showName][i] = mediafile{ path: f, show: showName}
 		}
 	}
 
@@ -67,20 +69,33 @@ func findMedia(dirs []string) (map[string][]mediafile, error) {
 }
 
 // Returns a copy of the generated schedule or an error
-func (s *schedule) generate() ([]mediafile, error)  {
+func (s *schedule) generate(ctx context.Context) ([]mediafile, error)  {
 	var c = 0
+
+	rem, err := s.timeRemaining()
+			if err != nil {
+				return nil, err
+			}
+
 	for {
+		select {
+		case <-ctx.Done():
+			return []mediafile{}, errors.New("context canceled")
+		default:
 		// Doing this for every loop is so insanely expensive
-		rem, err := s.timeRemaining()
-		if err != nil {
-			return nil, err
-		}
 
-		if rem > time.Duration(24 * time.Hour) || c > 100 { // 24 hours or 100 files is enough
-			return s.scheduled, nil
-		}
+			if rem > time.Duration(24 * time.Hour) || c > 100 { // 24 hours or 100 files is enough
+				return s.scheduled, nil
+			}
 
-		s.scheduled = append(s.scheduled, s.randomFile())
+			rf := s.randomFile()
+
+			log.Debug("appending new file to schedule", "file", rf.path)
+
+			s.scheduled = append(s.scheduled, rf)
+			dur, _ := rf.Duration()
+			rem += dur
+		}
 	}
 }
 
@@ -105,16 +120,22 @@ func (s schedule) timeRemaining() (time.Duration, error) {
 	var total = time.Duration(0)
 
 	for _, mf := range s.scheduled {
-		fileDuration, err := mf.Duration() // caching this duration would improve performance
-		if err != nil {
-			return 0, err
-		}
+		// fileDuration, err := mf.DurationString() // caching this duration would improve performance
+		// if err != nil {
+		// 	return 0, err
+		// }
 
-		dur, err := time.ParseDuration(fileDuration)
-		if err != nil {
-			return 0, err
-		}
+		// dur, err := time.ParseDuration(fileDuration)
+		// if err != nil {
+		// 	return 0, err
+		// }
 
+		// If there's an error getting the duration, dur is 0
+		dur, err := mf.Duration()
+		if err != nil {
+			log.Warn("Could not get duration", "mf", mf)
+		}
+		
 		total += dur
 	}
 

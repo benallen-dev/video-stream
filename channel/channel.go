@@ -83,7 +83,7 @@ func (c *Channel) AddClient() (chan []byte, func()) {
 // should call Start for a given Channel instance.
 func (c *Channel) Start(ctx context.Context) error {
 	// Generate the schedule
-	generated, err := c.schedule.generate()
+	generated, err := c.schedule.generate(ctx)
 	if err != nil {
 		log.Error("Could not generate schedule", "channel", c.Name(), "error", err.Error())
 		return err
@@ -196,7 +196,7 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 
 	cmd := exec.Command("ffmpeg", ffmpegArgs...)
 
-	dur, err := f.Duration()
+	dur, err := f.DurationString()
 	if err != nil {
 		log.Warn("[streamFile] couldn't get file duration", "error", err.Error(), "channel", c.Name())
 	}

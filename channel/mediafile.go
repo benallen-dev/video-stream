@@ -6,17 +6,23 @@ import (
 	"strings"
 	"strconv"
  	"os/exec"
+	"time"
 
 	"video-stream/log"
 )
 
 type mediafile struct {
+	show string
 	path string
+	duration time.Duration
+	languages map[int]string
 }
 
-func (mf mediafile) Duration() (string, error) {
-	// TODO add cache
-
+func (mf *mediafile) Duration() (time.Duration, error) {
+	if mf.duration != 0 {
+		log.Debug("Using cached duration")
+		return mf.duration, nil
+	}
 	cmd := exec.Command(
 		"ffprobe",
 		"-i", mf.path,
@@ -27,23 +33,39 @@ func (mf mediafile) Duration() (string, error) {
 
 	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to run ffprobe: %w", err)
+		return 0, fmt.Errorf("failed to run ffprobe: %w", err)
 	}
 
 	durationStr := strings.TrimSpace(string(out))
 	durationSec, err := strconv.ParseFloat(durationStr, 64)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse duration: %w", err)
+		return 0, fmt.Errorf("failed to parse duration: %w", err)
 	}
 
-	// TODO: Don't use string representation but time.Duration
+	mf.duration = time.Duration(durationSec * float64(time.Second))
+	return mf.duration, nil
+}
+
+// Can't we just replace this with .Duration().Format(time.DateTime) ?
+func (mf *mediafile) DurationString() (string, error) {
+	dd, err := mf.Duration()
+	if err != nil {
+		return "UNKNOWN", err
+	}
+
+	durationSec := dd.Seconds()
+	
 	minutes := int(durationSec) / 60
 	seconds := int(durationSec) % 60
 	return fmt.Sprintf("%02dm%02ds", minutes, seconds), nil
 }
 
 
-func (mf mediafile) Languages() (map[int]string, error) {
+func (mf *mediafile) Languages() (map[int]string, error) {
+	if mf.languages != nil {
+		return mf.languages, nil
+	}
+
 	// Run ffprobe to extract audio stream indexes and language tags
 	cmd := exec.Command(
 		"ffprobe",
@@ -79,6 +101,8 @@ func (mf mediafile) Languages() (map[int]string, error) {
 			}
 		}
 	}
+
+	mf.languages = languages
 
 	return languages, nil
 }
