@@ -29,6 +29,22 @@ func (s skipRequest) String() string {
 	return fmt.Sprintf("Skip request @ %s", s.reqTime.Format(time.DateTime))
 }
 
+type playerState int
+
+const (
+	PlayerStopped playerState = iota
+	PlayerPlaying
+)
+
+var playerStateName = map[playerState]string{
+	PlayerStopped: "stopped",
+	PlayerPlaying: "playing",
+}
+
+func (ps playerState) String() string {
+	return playerStateName[ps]
+}
+
 // Channel behaves like an old school TV channel, except it's streaming MPEG-TS
 // instead of analogue TV signals.
 //
@@ -41,6 +57,7 @@ type Channel struct {
 	playChan    chan playRequest
 	stopChan    chan stopRequest
 	skipChan    chan skipRequest
+	state       playerState
 }
 
 // New creates a new Channel with the given name and a list of show file paths.
@@ -113,9 +130,11 @@ func (c *Channel) Start(ctx context.Context) error {
 		select {
 		case startReq := <-c.playChan:
 			log.Info("[channel loop] start request recieved, starting player", "channel", c.Name(), "request", startReq.String())
+			c.state = PlayerPlaying
 			cancelPlayer = c.startPlayer(childCtx)
 		case stopReq := <-c.stopChan:
 			log.Info("[channel loop] stop request recieved, cancelling player", "channel", c.Name(), "request", stopReq.String())
+			c.state = PlayerStopped
 			cancelPlayer()
 		case <-ctx.Done():
 			log.Info("[channel loop] outer context canceled, exiting channel", "channel", c.Name())
@@ -124,8 +143,14 @@ func (c *Channel) Start(ctx context.Context) error {
 	}
 }
 
-func (c *Channel) SkipFile() {
-	c.skipChan <- skipRequest{reqTime: time.Now()}
+// Returns a boolean indicating if a skip request was made
+func (c *Channel) SkipFile() bool {
+	if c.state == PlayerPlaying {
+		c.skipChan <- skipRequest{reqTime: time.Now()}
+		return true
+	}
+
+	return false
 }
 
 // startPlayer launches a background goroutine that continuously streams files

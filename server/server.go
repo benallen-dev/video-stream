@@ -77,7 +77,12 @@ func Start(ctx context.Context, chs []*channel.Channel) {
 
 		http.HandleFunc(streamRoute+"/skip", func(w http.ResponseWriter, r *http.Request) {
 			log.Info("[HTTP Server] /skip", "channel", ch.Name(), "client", r.RemoteAddr)
-			ch.SkipFile()
+			success := ch.SkipFile()
+
+			if !success {
+				w.WriteHeader(400)
+				w.Write([]byte("Not playing\n"))
+			}
 		})
 
 	}
