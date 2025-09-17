@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"sync"
-	"time"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
+	"time"
 
 	"video-stream/channel"
 	"video-stream/config"
@@ -17,7 +17,6 @@ import (
 
 // TODO:
 // - Scheduling
-//   - Generate schedule when starting
 //   - Periodically extend schedule
 //   - Use schedule when deciding what to play
 // - Optimisation
@@ -33,11 +32,8 @@ func main() {
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	defer ctxCancel()
 
-	// Read config and build "channels"
-	cfg, err := config.Read()
-	if err != nil {
-		log.Fatal("[main] Could not read config:", "msg", err.Error())
-	}
+	// Is this a copy or a pointer?
+	cfg := config.Current
 
 	log.SetLevel(cfg.LogLevel)
 
@@ -70,11 +66,11 @@ func main() {
 	// Wait for interrupt
 	go func() {
 		done := make(chan os.Signal, 1)
-  		signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
-  		log.Info("[main] waiting until SIGINT")
-  		<-done  // Will block here until user hits ctrl+c
+		signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
+		log.Info("[main] waiting until SIGINT")
+		<-done // Will block here until user hits ctrl+c
 		log.Info("[main] received SIGINT")
-  		ctxCancel()
+		ctxCancel()
 	}()
 
 	wg.Wait()

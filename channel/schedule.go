@@ -4,20 +4,21 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"maps"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path"
-	"maps"
-	"strings"
 	"slices"
+	"strings"
 	"time"
 
+	"video-stream/config"
 	"video-stream/log"
 )
 
-type schedule struct{
-	media map[string][]mediafile
+type schedule struct {
+	media     map[string][]mediafile
 	scheduled []mediafile
 }
 
@@ -57,11 +58,11 @@ func findMedia(dirs []string) (map[string][]mediafile, error) {
 
 		// Split output by newlines to get individual file paths
 		files := strings.Split(strings.TrimSpace(buf.String()), "\n")
-		
+
 		showName := path.Base(dir)
 		out[showName] = make([]mediafile, len(files))
 		for i, f := range files {
-			out[showName][i] = mediafile{ path: f, show: showName}
+			out[showName][i] = mediafile{path: f, show: showName}
 		}
 	}
 
@@ -69,22 +70,21 @@ func findMedia(dirs []string) (map[string][]mediafile, error) {
 }
 
 // Returns a copy of the generated schedule or an error
-func (s *schedule) generate(ctx context.Context) ([]mediafile, error)  {
+func (s *schedule) generate(ctx context.Context) ([]mediafile, error) {
 	var c = 0
 
 	rem, err := s.timeRemaining()
-			if err != nil {
-				return nil, err
-			}
+	if err != nil {
+		return nil, err
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			return []mediafile{}, errors.New("context canceled")
 		default:
-		// Doing this for every loop is so insanely expensive
 
-			if rem > time.Duration(24 * time.Hour) || c > 100 { // 24 hours or 100 files is enough
+			if rem > config.Current.ScheduleHorizon || c > 100 { // Either longer than configured, or 100 files
 				return s.scheduled, nil
 			}
 
@@ -102,7 +102,6 @@ func (s *schedule) generate(ctx context.Context) ([]mediafile, error)  {
 func (s *schedule) nextFile() {
 	// pop next file off
 }
-
 
 func (s schedule) randomFile() mediafile {
 	// Pick a random show
@@ -135,7 +134,7 @@ func (s schedule) timeRemaining() (time.Duration, error) {
 		if err != nil {
 			log.Warn("Could not get duration", "mf", mf)
 		}
-		
+
 		total += dur
 	}
 

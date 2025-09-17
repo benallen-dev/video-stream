@@ -1,4 +1,5 @@
 logLevel: info
+scheduleHorizon: 12h # sets how far ahead to schedule files
 channels:
   Name of Channel:
   - /path/to/directory/containing/media/files
