@@ -23,6 +23,12 @@ func (s stopRequest) String() string {
 	return fmt.Sprintf("Stop request @ %s", s.reqTime.Format(time.DateTime))
 }
 
+type skipRequest struct{ reqTime time.Time }
+
+func (s skipRequest) String() string {
+	return fmt.Sprintf("Skip request @ %s", s.reqTime.Format(time.DateTime))
+}
+
 // Channel behaves like an old school TV channel, except it's streaming MPEG-TS
 // instead of analogue TV signals.
 //
@@ -34,6 +40,7 @@ type Channel struct {
 	connections *connectionList
 	playChan    chan playRequest
 	stopChan    chan stopRequest
+	skipChan    chan skipRequest
 }
 
 // New creates a new Channel with the given name and a list of show file paths.
@@ -43,6 +50,7 @@ func New(name string, shows []string) *Channel {
 	strMap := make(map[chan []byte]struct{})
 	playChan := make(chan playRequest)
 	stopChan := make(chan stopRequest)
+	skipChan := make(chan skipRequest)
 
 	return &Channel{
 		name:     name,
@@ -52,6 +60,7 @@ func New(name string, shows []string) *Channel {
 		},
 		playChan: playChan,
 		stopChan: stopChan,
+		skipChan: skipChan,
 	}
 }
 
@@ -89,7 +98,6 @@ func (c *Channel) Start(ctx context.Context) error {
 		return err
 	}
 
-
 	for _, g := range generated {
 		log.Debug(g.path)
 	}
@@ -116,6 +124,10 @@ func (c *Channel) Start(ctx context.Context) error {
 	}
 }
 
+func (c *Channel) SkipFile() {
+	c.skipChan <- skipRequest{reqTime: time.Now()}
+}
+
 // startPlayer launches a background goroutine that continuously streams files
 // from the channel's schedule until the provided context is canceled.
 //
@@ -126,7 +138,6 @@ func (c *Channel) Start(ctx context.Context) error {
 // terminate playback, otherwise the goroutine will continue running until the
 // parent context expires.
 func (c *Channel) startPlayer(ctx context.Context) func() {
-	var DELAY = 2
 	childCtx, cancelCtx := context.WithCancel(ctx)
 
 	go func() {
@@ -143,8 +154,7 @@ func (c *Channel) startPlayer(ctx context.Context) func() {
 				log.Debug("[startPlayer] child context is canceled, exiting")
 				return
 			default:
-				log.Debugf("[startPlayer] waiting %d seconds before starting next file", DELAY)
-				time.Sleep(time.Duration(2*time.Second))
+				log.Debug("Playing next file")
 			}
 		}
 	}()
@@ -170,7 +180,7 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 		"-avoid_negative_ts", "make_zero",
 
 		// Get input
-		"-sseof", "-10", // start N seconds from the end
+		// "-sseof", "-10", // start N seconds from the end
 		// "-ss", "45", // skip the first 45 seconds
 		"-re", // throttle to realtime
 		"-i", f.path,
@@ -228,6 +238,11 @@ func (c *Channel) streamFile(f mediafile, ctx context.Context) {
 			case <-ctx.Done():
 				// kill ffmpeg command and return
 				log.Debug("[streamFile] context canceled, killing ffmpeg and returning", "channel", c.Name())
+				cmd.Process.Kill()
+				break streamloop
+			case skipRequest := <-c.skipChan:
+				// kill ffmpeg so it'll pick up the next file
+				log.Debug("[streamFile] skip request received, killing ffmpeg and returning", "channel", c.Name(), "stopRequest", skipRequest.String())
 				cmd.Process.Kill()
 				break streamloop
 			default:

@@ -27,15 +27,15 @@ func Start(ctx context.Context, chs []*channel.Channel) {
 
 	// For each channel, add to the m3u and create a handler that subscribes clients
 	for _, ch := range chs {
-		route := fmt.Sprintf("/%s.ts", strings.ToLower(strings.ReplaceAll(ch.Name(), " ", "-")))
+		streamRoute := fmt.Sprintf("/%s.ts", strings.ToLower(strings.ReplaceAll(ch.Name(), " ", "-")))
 
 		playlist = append(playlist,
 			fmt.Sprintf(`#EXTINF:-1, %s`, ch.Name()),
-			fmt.Sprintf(`http://%s:8080%s`, ip, route),
+			fmt.Sprintf(`http://%s:8080%s`, ip, streamRoute),
 		)
 
-		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
-			log.Info("[HTTP Server] client connected", "route", route, "channelName", ch.Name(), "client", r.RemoteAddr)
+		http.HandleFunc(streamRoute, func(w http.ResponseWriter, r *http.Request) {
+			log.Info("[HTTP Server] client connected", "route", streamRoute, "channelName", ch.Name(), "client", r.RemoteAddr)
 
 			w.Header().Set("Content-Type", "video/MP2T")
 
@@ -43,7 +43,7 @@ func Start(ctx context.Context, chs []*channel.Channel) {
 			stream, cleanup := ch.AddClient()
 
 			defer func() {
-				log.Info("[HTTP Server] client disconnected", "route", route, "channelName", ch.Name(), "client", r.RemoteAddr)
+				log.Info("[HTTP Server] client disconnected", "route", streamRoute, "channelName", ch.Name(), "client", r.RemoteAddr)
 				cleanup()
 			}()
 
@@ -54,12 +54,12 @@ func Start(ctx context.Context, chs []*channel.Channel) {
 					// Close TCP connection
 					hj, ok := w.(http.Hijacker)
 					if !ok {
-						log.Error("[HandleFunc] webserver doesn't support hijacking", "route", route)
+						log.Error("[HandleFunc] webserver doesn't support hijacking", "route", streamRoute)
 						return
 					}
 					conn, _, err := hj.Hijack()
 					if err != nil {
-						log.Error("[HandleFunc] failed to hijack TCP connection", "route", route)
+						log.Error("[HandleFunc] failed to hijack TCP connection", "route", streamRoute)
 					}
 					conn.Close()
 
@@ -74,6 +74,12 @@ func Start(ctx context.Context, chs []*channel.Channel) {
 				}
 			}
 		})
+
+		http.HandleFunc(streamRoute+"/skip", func(w http.ResponseWriter, r *http.Request) {
+			log.Info("[HTTP Server] /skip", "channel", ch.Name(), "client", r.RemoteAddr)
+			ch.SkipFile()
+		})
+
 	}
 
 	// Simple playlist
