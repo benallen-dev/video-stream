@@ -17,9 +17,15 @@ import (
 	"video-stream/log"
 )
 
+type scheduleItem struct {
+	mediafile mediafile
+	start     time.Time
+	end       time.Time
+}
+
 type schedule struct {
 	media     map[string][]mediafile
-	scheduled []mediafile
+	scheduled []scheduleItem
 }
 
 func newSchedule(shows []string) *schedule {
@@ -70,37 +76,49 @@ func findMedia(dirs []string) (map[string][]mediafile, error) {
 }
 
 // Returns a copy of the generated schedule or an error
-func (s *schedule) generate(ctx context.Context) ([]mediafile, error) {
-	var c = 0
-
-	rem, err := s.timeRemaining()
-	if err != nil {
-		return nil, err
-	}
-
+func (s *schedule) generate(ctx context.Context) ([]scheduleItem, error) {
 	for {
 		select {
 		case <-ctx.Done():
-			return []mediafile{}, errors.New("context canceled")
+			return []scheduleItem{}, errors.New("context canceled")
 		default:
+			var endTime time.Time
 
-			if rem > config.Current.ScheduleHorizon || c > 100 { // Either longer than configured, or 100 files
+			if len(s.scheduled) > 0 {
+				endTime = s.scheduled[len(s.scheduled)-1].end
+			} else {
+				endTime = time.Now()
+			}
+
+			if endTime.After(time.Now().Add(config.Current.ScheduleHorizon)) || len(s.scheduled) >= 100 { // Either longer than configured, or 100 files
 				return s.scheduled, nil
 			}
 
 			rf := s.randomFile()
+			dur, _ := rf.Duration() // don't care about errors here
 
 			log.Debug("appending new file to schedule", "file", rf.path)
+			si := scheduleItem{
+				mediafile: rf,
+				start:     endTime,
+				end:       endTime.Add(dur).Add(time.Second), // add a little margin
+			}
 
-			s.scheduled = append(s.scheduled, rf)
-			dur, _ := rf.Duration()
-			rem += dur
+			s.scheduled = append(s.scheduled, si)
 		}
 	}
 }
 
-func (s *schedule) nextFile() {
-	// pop next file off
+func (s *schedule) nextFile() mediafile {
+	// TODO:
+	// - determine if time.Now() exists inside s.scheduled
+	// - if not, call generate() before continuing
+	// - play the correct file at the correct start time
+
+	next := s.scheduled[0]
+	s.scheduled = s.scheduled[0:] // because scheduled is max 100 items it's not worth using a linked list or whatever
+
+	return next.mediafile
 }
 
 func (s schedule) randomFile() mediafile {
@@ -115,28 +133,15 @@ func (s schedule) randomFile() mediafile {
 	return files[randomIdx]
 }
 
+// Unused?
 func (s schedule) timeRemaining() (time.Duration, error) {
-	var total = time.Duration(0)
 
-	for _, mf := range s.scheduled {
-		// fileDuration, err := mf.DurationString() // caching this duration would improve performance
-		// if err != nil {
-		// 	return 0, err
-		// }
-
-		// dur, err := time.ParseDuration(fileDuration)
-		// if err != nil {
-		// 	return 0, err
-		// }
-
-		// If there's an error getting the duration, dur is 0
-		dur, err := mf.Duration()
-		if err != nil {
-			log.Warn("Could not get duration", "mf", mf)
-		}
-
-		total += dur
+	// get last item
+	if len(s.scheduled) == 0 {
+		return time.Duration(0), nil
 	}
 
-	return total, nil
+	last := s.scheduled[len(s.scheduled)-1]
+	// get its end time
+	return time.Until(last.end), nil
 }

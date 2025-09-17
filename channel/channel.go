@@ -116,7 +116,7 @@ func (c *Channel) Start(ctx context.Context) error {
 	}
 
 	for _, g := range generated {
-		log.Debug(g.path)
+		log.Debug(g.mediafile.path)
 	}
 
 	log.Info("Schedule generation complete", "channel", c.Name())
