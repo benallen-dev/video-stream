@@ -2,3 +2,4 @@ bin
 tmp
 
 config.yaml
+server/web/static/style.css
