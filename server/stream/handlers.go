@@ -1,10 +1,10 @@
 package stream
 
 import (
-	"fmt"
 	"context"
-	"strings"
+	"fmt"
 	"net/http"
+	"strings"
 	"video-stream/channel"
 	"video-stream/log"
 )
@@ -43,7 +43,6 @@ func NewHandler(ctx context.Context, chs []*channel.Channel) http.Handler {
 				cleanup()
 			}()
 
-			// stream to this client
 			for data := range stream {
 				select {
 				case <-ctx.Done(): // If the server is shutting down
@@ -60,7 +59,7 @@ func NewHandler(ctx context.Context, chs []*channel.Channel) http.Handler {
 					conn.Close()
 
 					return
-				default:
+				default: // stream to this client
 					if _, err := w.Write(data); err != nil {
 						return
 					}
