@@ -2,7 +2,6 @@ package channel
 
 import (
 	"context"
-	"fmt"
 	"os/exec"
 	"path"
 	"strconv"
@@ -11,39 +10,6 @@ import (
 	"video-stream/log"
 )
 
-type playRequest struct{ reqTime time.Time }
-
-func (p playRequest) String() string {
-	return fmt.Sprintf("Play request @ %s", p.reqTime.Format(time.DateTime))
-}
-
-type stopRequest struct{ reqTime time.Time }
-
-func (s stopRequest) String() string {
-	return fmt.Sprintf("Stop request @ %s", s.reqTime.Format(time.DateTime))
-}
-
-type skipRequest struct{ reqTime time.Time }
-
-func (s skipRequest) String() string {
-	return fmt.Sprintf("Skip request @ %s", s.reqTime.Format(time.DateTime))
-}
-
-type playerState int
-
-const (
-	PlayerStopped playerState = iota
-	PlayerPlaying
-)
-
-var playerStateName = map[playerState]string{
-	PlayerStopped: "stopped",
-	PlayerPlaying: "playing",
-}
-
-func (ps playerState) String() string {
-	return playerStateName[ps]
-}
 
 // Channel behaves like an old school TV channel, except it's streaming MPEG-TS
 // instead of analogue TV signals.
