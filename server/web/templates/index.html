@@ -2,30 +2,88 @@
 <html>
 
 <head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<script src="static/htmx.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/mpegts.js@latest/dist/mpegts.js"></script>
 	<link rel="stylesheet" href="static/style.css" />
 	<title>Video Stream</title>
-	<script src="https://cdn.jsdelivr.net/npm/mpegts.js@latest/dist/mpegts.js"></script>
+	<style>
+		@keyframes pulse-dot {
+
+			0%,
+			100% {
+				opacity: 1;
+			}
+
+			50% {
+				opacity: 0.5;
+			}
+		}
+
+		.pulse-dot {
+			animation: pulse-dot 2s ease-in-out infinite;
+		}
+	</style>
 </head>
 
-<body class="bg-stone-600 text-stone-200">
+<body class="bg-gray-900 text-gray-200">
 	<div class="p-8">
-		<h1 class="text-2xl font-bold my-4">Hi, I'm a heading</h1>
-		<div class="rounded-2xl overflow-hidden w-full h-full">
-			<video id="videoElement" controls autoplay></video>
-			<script src="static/player.js"></script>
+		<h1 class="text-3xl font-bold mb-6 text-white text-center">Channel Overview</h1>
+
+		<div>
+			<h2 class="text-2xl font-semibold mb-4 text-white">Available Channels</h2>
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-w-7xl mx-auto">
+				{{range .Channels}}
+				{{template "channel-card" .}}
+				{{end}}
+			</div>
+		</div>
+
+		<!-- Main video player section -->
+		<div class="rounded-2xl overflow-hidden w-full max-w-4xl mx-auto mt-8 bg-black">
+			<video id="videoElement" class="w-full" controls autoplay></video>
 		</div>
 	</div>
-	<div>
-		<h2>List of channels</h2>
-			<ul>
-				<li>
-					<h3>Channel N</h3>
-					<p>Status</p>
-					<p>If it's playing, show a player</p>
-					<p>Skip button</p>
-				</li>
-			</ul>
-		</div>
+
+	<!-- <script src="static/player.js"></script> -->
+	<script>
+		// Global function for playing channels
+		function playChannel(channelName) {
+			const streamUrl = `http://localhost:8080/stream/${channelName}.ts`;
+
+			// Clean up existing player if any
+			if (window.currentPlayer) {
+				window.currentPlayer.pause();
+				window.currentPlayer.unload();
+				window.currentPlayer.detachMediaElement();
+				window.currentPlayer.destroy();
+				window.currentPlayer = null;
+			}
+
+			// Create new player
+			if (mpegts.getFeatureList().mseLivePlayback) {
+				const player = mpegts.createPlayer({
+					type: 'mpegts',
+					isLive: true,
+					url: streamUrl
+				});
+
+				const videoElement = document.getElementById('videoElement');
+				player.attachMediaElement(videoElement);
+				player.load();
+				player.play();
+
+				// Store reference for cleanup
+				window.currentPlayer = player;
+
+				// Scroll to video
+				videoElement.scrollIntoView({behavior: 'smooth', block: 'center'});
+			} else {
+				alert('Your browser does not support MSE live playback');
+			}
+		}
+	</script>
 </body>
 
 </html>

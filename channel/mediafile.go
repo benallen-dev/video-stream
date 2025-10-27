@@ -2,20 +2,87 @@ package channel
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
-	"strings"
+	"os/exec"
 	"strconv"
- 	"os/exec"
+	"strings"
 	"time"
 
 	"video-stream/log"
 )
 
+// TODO: Get all metadata once with ffprobe, parse JSON instead of having
+// 3 different methods and CSV parsing and stuff.
+
 type mediafile struct {
-	show string
-	path string
-	duration time.Duration
+	name      string
+	show      string
+	path      string
+	duration  time.Duration
 	languages map[int]string
+}
+
+func (mf *mediafile) Name() string {
+	if mf.name == "" {
+		if err := mf.LoadMetadata(); err != nil {
+			log.Warn("error loading metadata", "mediafile", mf.path, "error", err.Error())
+		}
+	}
+
+	return mf.name
+}
+
+func (mf *mediafile) ShowName() string {
+	return mf.show
+}
+
+// TODO: Do this for all metadata fields at once
+func (mf *mediafile) LoadMetadata() error {
+	cmd := exec.Command(
+		"ffprobe",
+		"-i", mf.path,
+		"-show_entries", "stream=index:stream_tags=language:format_tags=title,show,season_number,episode_sort:format=duration",
+		"-v", "quiet",
+		"-of", "json",
+	)
+
+	out, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("ffprobe failed: %w", err)
+	}
+
+	var result struct {
+		Format struct {
+			Duration string `json:"duration"`
+			Tags     struct {
+				Title   string `json:"title"`
+				Show    string `json:"show"`
+				Season  string `json:"season_number"`
+				Episode string `json:"episode_sort"`
+			} `json:"tags"`
+		} `json:"format"`
+	}
+
+	if err := json.Unmarshal(out, &result); err != nil {
+		return fmt.Errorf("failed to parse ffprobe output: %w", err)
+	}
+
+	pretty, _ := json.MarshalIndent(result, "", "  ")
+	log.Info("ffprobe result", "pretty", string(pretty))
+
+	// Deal with missing metadata
+	if (result.Format.Tags.Title != "") {
+		mf.name = result.Format.Tags.Title
+	} else {
+		mf.name = mf.path
+	}
+
+	if duration, err := strconv.ParseFloat(result.Format.Duration, 64); err == nil {
+		mf.duration = time.Duration(duration * float64(time.Second))
+	}
+
+	return nil
 }
 
 func (mf *mediafile) Duration() (time.Duration, error) {
@@ -54,12 +121,11 @@ func (mf *mediafile) DurationString() (string, error) {
 	}
 
 	durationSec := dd.Seconds()
-	
+
 	minutes := int(durationSec) / 60
 	seconds := int(durationSec) % 60
 	return fmt.Sprintf("%02dm%02ds", minutes, seconds), nil
 }
-
 
 func (mf *mediafile) Languages() (map[int]string, error) {
 	if mf.languages != nil {

@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"video-stream/log"
@@ -25,6 +26,7 @@ type Channel struct {
 	skipChan    chan skipRequest
 	state       playerState
 	keepPlaying bool
+	nowPlaying  *mediafile
 }
 
 // New creates a new Channel with the given name and a list of show file paths.
@@ -42,9 +44,9 @@ func New(name string, shows []string) *Channel {
 		connections: &connectionList{
 			streams: strMap,
 		},
-		playChan: playChan,
-		stopChan: stopChan,
-		skipChan: skipChan,
+		playChan:    playChan,
+		stopChan:    stopChan,
+		skipChan:    skipChan,
 		keepPlaying: false,
 	}
 }
@@ -53,8 +55,28 @@ func (c *Channel) Name() string {
 	return c.name
 }
 
+func (c *Channel) PathName() string {
+	return strings.ToLower(strings.ReplaceAll(c.name, " ", "-"))
+}
+
 func (c *Channel) Count() int {
 	return c.connections.Count()
+}
+
+func (c *Channel) IsPlaying() bool {
+	return c.state == PlayerPlaying
+}
+
+func (c *Channel) NowPlaying() string {
+	if c.nowPlaying != nil {
+	return c.nowPlaying.ShowName()
+	} else {
+		return "Not playing"
+	}
+}
+
+func (c *Channel) ShouldKeepPlaying() bool {
+	return c.keepPlaying
 }
 
 // Sets the 'keep playing' flag, preventing ffmpeg from being
@@ -133,6 +155,7 @@ func (c *Channel) Start(ctx context.Context) error {
 		case stopReq := <-c.stopChan:
 			log.Info("[channel loop] stop request recieved, cancelling player", "channel", c.Name(), "request", stopReq.String())
 			c.state = PlayerStopped
+			c.nowPlaying = nil
 			cancelPlayer()
 		case <-ctx.Done():
 			log.Info("[channel loop] outer context canceled, exiting channel", "channel", c.Name())
@@ -166,7 +189,9 @@ func (c *Channel) startPlayer(ctx context.Context) func() {
 	go func() {
 		for {
 			log.Debug("[startPlayer] Starting stream", "channel", c.Name())
-			c.streamFile(c.schedule.randomFile(), childCtx)
+			mf := c.schedule.randomFile()
+			c.nowPlaying = &mf
+			c.streamFile(mf, childCtx)
 			log.Debug("[startPlayer] Stream finished", "channel", c.Name())
 
 			select {
