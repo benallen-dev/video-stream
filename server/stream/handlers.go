@@ -80,6 +80,39 @@ func NewHandler(ctx context.Context, chs []*channel.Channel) http.Handler {
 			}
 		})
 
+		mux.HandleFunc(streamRoute+"/keepPlaying", func(w http.ResponseWriter, r *http.Request) {
+			qCancel := r.URL.Query().Get("cancel")
+			if qCancel != "" {
+				log.Info("[HTTP Server] /keepPlaying", "qCancel", qCancel, "channel", ch.Name(), "client", r.RemoteAddr)
+				err := ch.ClearKeepPlaying()
+
+				if err != nil {
+					log.Warn("[HTTP Server] /keepPlaying channel not playing", "qCancel", qCancel, "channel", ch.Name(), "client", r.RemoteAddr)
+
+					w.WriteHeader(500)
+					w.Write([]byte("Error clearing keepPlaying: not playing\n"))
+					return
+				}
+
+				w.WriteHeader(200)
+				w.Write([]byte("keepPlaying cleared"))
+			} else {
+
+				log.Info("[HTTP Server] /keepPlaying", "channel", ch.Name(), "client", r.RemoteAddr)
+				err := ch.SetKeepPlaying()
+
+				if err != nil {
+					log.Warn("[HTTP Server] /keepPlaying channel not playing", "channel", ch.Name(), "client", r.RemoteAddr)
+
+					w.WriteHeader(500)
+					w.Write([]byte("Error setting keepPlaying: not playing\n"))
+					return
+				}
+
+				w.WriteHeader(200)
+				w.Write([]byte("keepPlaying set"))
+			}
+		})
 	}
 
 	// Simple playlist

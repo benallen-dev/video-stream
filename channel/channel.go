@@ -2,6 +2,7 @@ package channel
 
 import (
 	"context"
+	"errors"
 	"os/exec"
 	"path"
 	"strconv"
@@ -9,7 +10,6 @@ import (
 
 	"video-stream/log"
 )
-
 
 // Channel behaves like an old school TV channel, except it's streaming MPEG-TS
 // instead of analogue TV signals.
@@ -24,6 +24,7 @@ type Channel struct {
 	stopChan    chan stopRequest
 	skipChan    chan skipRequest
 	state       playerState
+	keepPlaying bool
 }
 
 // New creates a new Channel with the given name and a list of show file paths.
@@ -44,6 +45,7 @@ func New(name string, shows []string) *Channel {
 		playChan: playChan,
 		stopChan: stopChan,
 		skipChan: skipChan,
+		keepPlaying: false,
 	}
 }
 
@@ -55,8 +57,34 @@ func (c *Channel) Count() int {
 	return c.connections.Count()
 }
 
+// Sets the 'keep playing' flag, preventing ffmpeg from being
+// stopped after the last client disconnects.
+func (c *Channel) SetKeepPlaying() error {
+	if c.state == PlayerStopped {
+		return errors.New("nothing playing")
+	}
+
+	c.keepPlaying = true
+	return nil
+}
+
+// Clear the 'keep playing' flag, and sends a stoprequest if
+// there are no clients connected
+func (c *Channel) ClearKeepPlaying() error {
+	if c.state != PlayerPlaying {
+		return errors.New("cannot clear keepPlaying, player is stopped")
+	}
+
+	c.keepPlaying = false
+	if c.connections.Count() < 1 {
+		c.stopChan <- stopRequest{reqTime: time.Now()}
+	}
+	return nil
+}
+
 func (c *Channel) AddClient() (chan []byte, func()) {
-	if c.connections.Count() == 0 {
+	if c.state != PlayerPlaying && c.connections.Count() == 0 {
+		log.Debug("[AddClient] sending playRequest")
 		c.playChan <- playRequest{reqTime: time.Now()}
 	}
 
@@ -65,8 +93,12 @@ func (c *Channel) AddClient() (chan []byte, func()) {
 		conns := cleanup() // cleanup returns number of connections after removal
 		log.Debug("[AddClient::cleanup] called cleanup", "remaining_connections", strconv.Itoa(conns))
 		if conns == 0 {
-			log.Debug("[AddClient::cleanup] sending stopRequest")
-			c.stopChan <- stopRequest{reqTime: time.Now()}
+			if c.keepPlaying == true {
+				log.Debug("[AddClient::cleanup] keepPlaying is set to true, skipping stopRequest")
+			} else {
+				log.Debug("[AddClient::cleanup] sending stopRequest")
+				c.stopChan <- stopRequest{reqTime: time.Now()}
+			}
 		}
 	}
 }
@@ -74,18 +106,18 @@ func (c *Channel) AddClient() (chan []byte, func()) {
 // Start blocks until the provided context is canceled. Only one goroutine
 // should call Start for a given Channel instance.
 func (c *Channel) Start(ctx context.Context) error {
-	// Generate the schedule
-	generated, err := c.schedule.generate(ctx)
-	if err != nil {
-		log.Error("Could not generate schedule", "channel", c.Name(), "error", err.Error())
-		return err
-	}
+	// Channel schedule generation skipped for now, as it isn't used in practice
+	// generated, err := c.schedule.generate(ctx)
+	// if err != nil {
+	// 	log.Error("Could not generate schedule", "channel", c.Name(), "error", err.Error())
+	// 	return err
+	// }
 
-	for _, g := range generated {
-		log.Debug(g.mediafile.path)
-	}
+	// for _, g := range generated {
+	// 	log.Debug(g.mediafile.path)
+	// }
 
-	log.Info("Schedule generation complete", "channel", c.Name())
+	// log.Info("Schedule generation complete", "channel", c.Name())
 
 	childCtx, cancelCtx := context.WithCancel(ctx)
 	defer cancelCtx()
@@ -145,7 +177,8 @@ func (c *Channel) startPlayer(ctx context.Context) func() {
 				log.Debug("[startPlayer] child context is canceled, exiting")
 				return
 			default:
-				log.Debug("Playing next file")
+				log.Debug("[startPlayer] playing next file, clearing keepPlaying flag")
+				c.keepPlaying = false
 			}
 		}
 	}()
