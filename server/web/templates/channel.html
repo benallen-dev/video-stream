@@ -1,5 +1,5 @@
 {{define "channel-card"}}
-<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-4 border {{if .IsPlaying}}border-green-500 hover:border-green-400 hover:shadow-green-500/20{{else}}border-gray-700 hover:border-blue-500 hover:shadow-blue-500/20{{end}} hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 relative overflow-hidden" 
+<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-4 border {{if .IsPlaying}}border-green-500 hover:border-green-400 hover:shadow-green-500/20{{else}}border-gray-700 hover:border-blue-500 hover:shadow-blue-500/20{{end}} hover:shadow-lg transition-all duration-300 relative overflow-hidden" 
      hx-get="/web/channel/{{.PathName}}/status" 
      hx-trigger="every 5s"
      hx-swap="outerHTML">
