@@ -177,7 +177,8 @@ func (mf *mediafile) hasEnglishAudio() bool {
 
 	langs, err := mf.Languages()
 	if err != nil {
-		log.Fatal("could not get audio languages", "msg", err.Error())
+		log.Error("could not get audio languages", "msg", err.Error())
+		return false
 	}
 
 	hasEng := false
